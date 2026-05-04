@@ -362,7 +362,7 @@ body {
   <span id="status-nodes">Nodes: 0</span>
   <span id="status-edges">Edges: 0</span>
   <span id="status-hint">Drag palette items · Double-tap to rename · Pinch to zoom</span>
-  <span id="version-stamp">v2026-05-04c</span>
+  <span id="version-stamp">v2026-05-04d</span>
 </div>
 
 <div id="context-menu">
@@ -416,6 +416,50 @@ const safeStorage = {
   set(k, v) { try { localStorage.setItem(k, v); } catch {} }
 };
 
+// ─── Official C4 color palette ────────────────────────────────────────────────
+// Source: C4-PlantUML stdlib (c4model.com reference implementation)
+const C4_COLORS = {
+  person:    { bg:'#08427B', border:'#073B6F' },
+  system:    { bg:'#1168BD', border:'#3C7FC0' },
+  external:  { bg:'#999999', border:'#8A8A8A' },
+  extperson: { bg:'#686868', border:'#8A8A8A' },
+  // Containers
+  webapp:    { bg:'#438DD5', border:'#3C7FC0' },
+  mobileapp: { bg:'#438DD5', border:'#3C7FC0' },
+  api:       { bg:'#438DD5', border:'#3C7FC0' },
+  database:  { bg:'#438DD5', border:'#3C7FC0' },
+  queue:     { bg:'#438DD5', border:'#3C7FC0' },
+  // Components — light blue, use dark text
+  component: { bg:'#85BBF0', border:'#78A8D8' },
+  service:   { bg:'#85BBF0', border:'#78A8D8' },
+  repo:      { bg:'#85BBF0', border:'#78A8D8' },
+  facade:    { bg:'#85BBF0', border:'#78A8D8' },
+  factory:   { bg:'#85BBF0', border:'#78A8D8' },
+  // Code
+  class:     { bg:'#2C3E50', border:'#1A252F' },
+  interface: { bg:'#16A085', border:'#0E6655' },
+  abstract:  { bg:'#2980B9', border:'#1A5276' },
+  enum:      { bg:'#8E44AD', border:'#6C3483' },
+  package:   { bg:'#555555', border:'#444444' },
+};
+
+function c4BgColor(n) {
+  const c = C4_COLORS[n.type];
+  return n.color || (c ? c.bg : '#1168BD');
+}
+function c4BorderColor(n) {
+  const override = n.color;
+  if (override) return darken(override, 30);
+  const c = C4_COLORS[n.type];
+  return c ? c.border : '#3C7FC0';
+}
+// Luminance-based text color: dark bg → white text, light bg → dark text
+function c4TextColor(bgHex) {
+  const c = parseInt(bgHex.replace('#',''), 16);
+  const lum = (0.299*((c>>16)&0xff) + 0.587*((c>>8)&0xff) + 0.114*(c&0xff)) / 255;
+  return lum > 0.55 ? '#23292F' : '#FFFFFF';
+}
+
 // ─── Level config ────────────────────────────────────────────────────────────
 const LEVELS = ['context','container','component','code'];
 
@@ -423,47 +467,46 @@ const LEVEL_CONFIG = {
   context: {
     label: 'System Context',
     shapes: [
-      { type:'person',   label:'Person',         color:'#1168bd', icon:'👤' },
-      { type:'system',   label:'System',          color:'#1168bd', icon:'⬛' },
+      { type:'person',   label:'Person',         color:'#08427B', icon:'👤' },
+      { type:'system',   label:'Software System', color:'#1168BD', icon:'⬛' },
       { type:'external', label:'External System', color:'#999999', icon:'⬚' },
     ],
     legend: [
-      { color:'#1168bd', border:'#0d5094', label:'Internal / Person' },
-      { color:'#999999', border:'#777777', label:'External System'   },
+      { color:'#08427B', border:'#073B6F', label:'Person'          },
+      { color:'#1168BD', border:'#3C7FC0', label:'Software System' },
+      { color:'#999999', border:'#8A8A8A', label:'External'        },
     ]
   },
   container: {
     label: 'Container',
     shapes: [
-      { type:'webapp',    label:'Web App',        color:'#1168bd', icon:'🌐' },
-      { type:'mobileapp', label:'Mobile App',     color:'#1168bd', icon:'📱' },
-      { type:'api',       label:'API / Service',  color:'#1168bd', icon:'⚙️' },
-      { type:'database',  label:'Database',       color:'#1168bd', icon:'🗄️' },
-      { type:'queue',     label:'Message Queue',  color:'#e67e22', icon:'📨' },
-      { type:'person',    label:'Person',         color:'#888888', icon:'👤' },
+      { type:'webapp',    label:'Web App',        color:'#438DD5', icon:'🌐' },
+      { type:'mobileapp', label:'Mobile App',     color:'#438DD5', icon:'📱' },
+      { type:'api',       label:'API / Service',  color:'#438DD5', icon:'⚙️' },
+      { type:'database',  label:'Database',       color:'#438DD5', icon:'🗄️' },
+      { type:'queue',     label:'Message Queue',  color:'#438DD5', icon:'📨' },
+      { type:'person',    label:'Person',         color:'#08427B', icon:'👤' },
       { type:'external',  label:'External',       color:'#999999', icon:'⬚' },
     ],
     legend: [
-      { color:'#1168bd', border:'#0d5094', label:'Container'     },
-      { color:'#e67e22', border:'#c0651a', label:'Queue'         },
-      { color:'#999999', border:'#777777', label:'External'      },
+      { color:'#438DD5', border:'#3C7FC0', label:'Container' },
+      { color:'#08427B', border:'#073B6F', label:'Person'    },
+      { color:'#999999', border:'#8A8A8A', label:'External'  },
     ]
   },
   component: {
     label: 'Component',
     shapes: [
-      { type:'component', label:'Component',   color:'#1168bd', icon:'🔷' },
-      { type:'service',   label:'Service',     color:'#27ae60', icon:'⚡' },
-      { type:'repo',      label:'Repository',  color:'#8e44ad', icon:'📦' },
-      { type:'facade',    label:'Facade',      color:'#16a085', icon:'🔲' },
-      { type:'factory',   label:'Factory',     color:'#d35400', icon:'🏭' },
-      { type:'external',  label:'External',    color:'#999999', icon:'⬚' },
+      { type:'component', label:'Component',   color:'#85BBF0', icon:'🔷' },
+      { type:'service',   label:'Service',     color:'#85BBF0', icon:'⚡' },
+      { type:'repo',      label:'Repository',  color:'#85BBF0', icon:'📦' },
+      { type:'facade',    label:'Facade',      color:'#85BBF0', icon:'🔲' },
+      { type:'factory',   label:'Factory',     color:'#85BBF0', icon:'🏭' },
+      { type:'external',  label:'External',    color:'#CCCCCC', icon:'⬚' },
     ],
     legend: [
-      { color:'#1168bd', border:'#0d5094', label:'Component'  },
-      { color:'#27ae60', border:'#1e8449', label:'Service'    },
-      { color:'#8e44ad', border:'#6c3483', label:'Repository' },
-      { color:'#999999', border:'#777777', label:'External'   },
+      { color:'#85BBF0', border:'#78A8D8', label:'Component' },
+      { color:'#CCCCCC', border:'#BFBFBF', label:'External'  },
     ]
   },
   code: {
@@ -634,113 +677,138 @@ function wrapText(c, text, maxW) {
 
 function drawNode(n) {
   const r   = nodeRect(n);
-  const sel = state.selection.includes(n.id);
-  const hov = state.hovered === n.id;
-  const col = n.color || '#1168bd';
-  const dark = darken(col, 40);
+  const sel    = state.selection.includes(n.id);
+  const hov    = state.hovered === n.id;
+  const bg     = c4BgColor(n);
+  const border = c4BorderColor(n);
+  const fg     = c4TextColor(bg);                  // white or dark depending on luminance
+  const fgA    = fg === '#FFFFFF' ? 'rgba(255,255,255,0.7)'  : 'rgba(35,41,47,0.65)';
+  const fgB    = fg === '#FFFFFF' ? 'rgba(255,255,255,0.55)' : 'rgba(35,41,47,0.5)';
+  const cx     = r.x + r.w / 2;
 
   ctx.save();
+  if (sel) { ctx.shadowColor = '#0969da'; ctx.shadowBlur = 16; }
+  else if (hov) { ctx.shadowColor = 'rgba(0,0,0,0.2)'; ctx.shadowBlur = 10; }
 
-  if (sel) { ctx.shadowColor = getVar('--accent'); ctx.shadowBlur = 14; }
-  else if (hov) { ctx.shadowColor = 'rgba(128,128,128,0.5)'; ctx.shadowBlur = 10; }
-
-  ctx.fillStyle   = col;
-  ctx.strokeStyle = dark;
-  ctx.lineWidth   = sel ? 2.5 : 1.5;
-
-  if (n.type === 'person') {
-    // Stick figure — drawn manually, no fill-rect header
+  // ── Person: C4 style — rounded box with head+body icon ────────────────────
+  if (n.type === 'person' || n.type === 'extperson') {
+    ctx.fillStyle = bg; ctx.strokeStyle = border;
+    ctx.lineWidth = sel ? 2.5 : 1.5;
+    roundRect(ctx, r.x, r.y, r.w, r.h, 6);
+    ctx.fill(); ctx.stroke();
     ctx.shadowBlur = 0;
-    const cx   = r.x + r.w/2;
-    const hr   = Math.min(r.w, r.h) * 0.18;
-    const hy   = r.y + hr + 4;
-    const body = hy + hr;
-    ctx.beginPath(); ctx.arc(cx, hy, hr, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx, body); ctx.lineTo(cx, r.y+r.h-14); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(r.x+12, body+12); ctx.lineTo(r.x+r.w-12, body+12); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx, r.y+r.h-14); ctx.lineTo(r.x+16, r.y+r.h-2); ctx.moveTo(cx, r.y+r.h-14); ctx.lineTo(r.x+r.w-16, r.y+r.h-2); ctx.stroke();
-    // Label below figure — uses themed text color, since it's on the canvas bg
-    ctx.fillStyle = getVar('--text');
-    ctx.font = 'bold 12px -apple-system,sans-serif';
+
+    // Person icon (white/dark silhouette)
+    const iconH  = r.h * 0.42;
+    const headR  = Math.min(r.w * 0.13, iconH * 0.38);
+    const headCY = r.y + iconH * 0.36;
+    const bodyR  = headR * 1.5;
+    const bodyY  = headCY + headR + 2;
+
+    ctx.fillStyle   = fg === '#FFFFFF' ? 'rgba(255,255,255,0.85)' : 'rgba(35,41,47,0.7)';
+    ctx.strokeStyle = fg === '#FFFFFF' ? 'rgba(255,255,255,0.3)'  : 'rgba(35,41,47,0.2)';
+    ctx.lineWidth   = 0.5;
+
+    ctx.beginPath(); ctx.arc(cx, headCY, headR, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, bodyY, bodyR, Math.PI, 0);    ctx.fill(); ctx.stroke();
+
+    // Text block below icon
+    const stereo   = n.stereotype || STEREO[n.type] || 'Person';
+    const textTop  = r.y + iconH + 4;
+    const textH    = r.h - iconH - 8;
+    const nameLines = wrapText(ctx, n.label||'Person', r.w-16);
+    const tech  = n.technology ? `[${n.technology}]` : '';
+    const descL = n.description ? wrapText(ctx, n.description, r.w-14).slice(0,2) : [];
+    const total = 11 + nameLines.length*14 + (tech?12:0) + (descL.length?descL.length*11+2:0);
+    let ty = textTop + Math.max(0, (textH - total) / 2);
+
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    const lines = wrapText(ctx, n.label||'Person', r.w-8);
-    let ly = r.y + r.h*0.66;
-    for (const l of lines) { ctx.fillText(l, cx, ly); ly += 14; }
+    ctx.fillStyle = fgA; ctx.font = 'italic 10px -apple-system,sans-serif';
+    ctx.fillText(`«${stereo}»`, cx, ty); ty += 13;
+
+    ctx.fillStyle = fg; ctx.font = 'bold 12px -apple-system,sans-serif';
+    for (const l of nameLines) { ctx.fillText(l, cx, ty); ty += 14; }
+
+    if (tech) { ctx.fillStyle = fgA; ctx.font = 'italic 10px -apple-system,sans-serif'; ctx.fillText(tech, cx, ty); ty += 12; }
+    if (descL.length) { ctx.fillStyle = fgB; ctx.font = '10px -apple-system,sans-serif'; for (const d of descL) { ctx.fillText(d, cx, ty); ty += 11; } }
+
+    if (canDrillDown(n)) { ctx.fillStyle = fgB; ctx.font = '9px monospace'; ctx.textAlign='right'; ctx.fillText('▶▶', r.x+r.w-5, r.y+r.h-5); }
     ctx.restore(); return;
   }
 
+  // ── Database (cylinder) ───────────────────────────────────────────────────
   if (n.type === 'database') {
+    ctx.fillStyle = bg; ctx.strokeStyle = border; ctx.lineWidth = sel ? 2.5 : 1.5;
     const ry = r.h * 0.13;
     ctx.beginPath();
-    ctx.ellipse(r.x+r.w/2, r.y+ry, r.w/2, ry, 0, Math.PI, 0);
+    ctx.ellipse(cx, r.y+ry, r.w/2, ry, 0, Math.PI, 0);
     ctx.lineTo(r.x+r.w, r.y+r.h-ry);
-    ctx.ellipse(r.x+r.w/2, r.y+r.h-ry, r.w/2, ry, 0, 0, Math.PI);
-    ctx.closePath();
-  } else if (n.type === 'queue') {
+    ctx.ellipse(cx, r.y+r.h-ry, r.w/2, ry, 0, 0, Math.PI);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // top ellipse outline
+    ctx.beginPath(); ctx.ellipse(cx, r.y+ry, r.w/2, ry, 0, 0, Math.PI*2); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  // ── Queue (horizontal cylinder) ─────────────────────────────────────────
+  else if (n.type === 'queue') {
+    ctx.fillStyle = bg; ctx.strokeStyle = border; ctx.lineWidth = sel ? 2.5 : 1.5;
     const rx = r.w * 0.12;
     ctx.beginPath();
     ctx.ellipse(r.x+rx, r.y+r.h/2, rx, r.h/2, 0, Math.PI/2, Math.PI*1.5);
     ctx.lineTo(r.x+r.w-rx, r.y);
     ctx.ellipse(r.x+r.w-rx, r.y+r.h/2, rx, r.h/2, 0, Math.PI*1.5, Math.PI/2);
-    ctx.closePath();
-  } else if (n.type === 'interface') {
-    ctx.setLineDash([5,3]);
-    roundRect(ctx, r.x, r.y, r.w, r.h, 8);
-    ctx.setLineDash([]);
-  } else {
-    roundRect(ctx, r.x, r.y, r.w, r.h, 6);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(r.x+rx, r.y+r.h/2, rx, r.h/2, 0, 0, Math.PI*2); ctx.stroke();
+    ctx.shadowBlur = 0;
   }
-  ctx.fill(); ctx.stroke();
-  ctx.shadowBlur = 0;
-
-  // Header strip
-  const tagH = 18;
-  if (n.type !== 'database' && n.type !== 'queue') {
-    ctx.save();
-    ctx.clip();
-    ctx.fillStyle = darken(col, 28);
-    ctx.fillRect(r.x, r.y, r.w, tagH);
-    ctx.restore();
+  // ── Interface (dashed border) ────────────────────────────────────────────
+  else if (n.type === 'interface') {
+    ctx.fillStyle = bg; ctx.strokeStyle = border; ctx.lineWidth = sel ? 2.5 : 1.5;
+    ctx.setLineDash([6,3]); roundRect(ctx, r.x, r.y, r.w, r.h, 8);
+    ctx.fill(); ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur = 0;
+  }
+  // ── Standard rounded rectangle ───────────────────────────────────────────
+  else {
+    ctx.fillStyle = bg; ctx.strokeStyle = border; ctx.lineWidth = sel ? 2.5 : 1.5;
+    roundRect(ctx, r.x, r.y, r.w, r.h, 6); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
   }
 
-  // Stereotype
-  const stereo = n.stereotype || STEREO[n.type] || n.type;
-  ctx.fillStyle = 'rgba(255,255,255,0.65)';
-  ctx.font = '10px -apple-system,sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(`«${stereo}»`, r.x+r.w/2, r.y+tagH/2);
+  // ── Text layout (all non-person) ─────────────────────────────────────────
+  // Stereotype — italic, small, top-center
+  const stereo    = n.stereotype || STEREO[n.type] || n.type;
+  const tech      = n.technology ? `[${n.technology}]` : '';
+  const nameLines = wrapText(ctx, n.label||'Untitled', r.w-16);
+  const descLines = n.description ? wrapText(ctx, n.description, r.w-14).slice(0,3) : [];
 
-  // Name
-  const topY  = r.y + tagH + 6;
-  const avail = r.h - tagH - 12;
-  const nameLines = wrapText(ctx, n.label||'Untitled', r.w-14);
-  const tech  = n.technology ? `[${n.technology}]` : '';
-  const descL = n.description ? wrapText(ctx, n.description, r.w-12).slice(0,2) : [];
-  const total = nameLines.length*15 + (tech?12:0) + (descL.length?(descL.length*11+4):0);
-  let ty = topY + Math.max(0,(avail-total)/2);
+  const lineH   = 14, techH = tech ? 13 : 0, descH = descLines.length * 11;
+  const total   = 13 + nameLines.length*lineH + techH + (descLines.length ? descH+3 : 0);
+  const padTop  = (n.type==='database'||n.type==='queue') ? 6 : 6;
+  let ty = r.y + padTop + Math.max(0, (r.h - padTop*2 - total) / 2);
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 13px -apple-system,sans-serif';
-  for (const l of nameLines) { ctx.fillText(l, r.x+r.w/2, ty+7); ty+=15; }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
 
-  if (tech) {
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = 'italic 10px -apple-system,sans-serif';
-    ctx.fillText(tech, r.x+r.w/2, ty+5); ty+=12;
-  }
-  if (descL.length) {
-    ty+=2;
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.font = '10px -apple-system,sans-serif';
-    for (const dl of descL) { ctx.fillText(dl, r.x+r.w/2, ty+5); ty+=11; }
+  // «stereotype» italic small
+  ctx.fillStyle = fgA; ctx.font = 'italic 10px -apple-system,sans-serif';
+  ctx.fillText(`«${stereo}»`, cx, ty); ty += 14;
+
+  // Name bold
+  ctx.fillStyle = fg; ctx.font = 'bold 13px -apple-system,sans-serif';
+  for (const l of nameLines) { ctx.fillText(l, cx, ty); ty += lineH; }
+
+  // [Technology] italic
+  if (tech) { ctx.fillStyle = fgA; ctx.font = 'italic 10px -apple-system,sans-serif'; ctx.fillText(tech, cx, ty); ty += techH; }
+
+  // Description small
+  if (descLines.length) {
+    ty += 3;
+    ctx.fillStyle = fgB; ctx.font = '10px -apple-system,sans-serif';
+    for (const d of descLines) { ctx.fillText(d, cx, ty); ty += 11; }
   }
 
   // Drill-down badge
   if (canDrillDown(n)) {
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText('⊕', r.x+r.w-5, r.y+r.h-4);
+    ctx.fillStyle = fgB; ctx.font = '9px monospace';
+    ctx.textAlign = 'right'; ctx.fillText('▶▶', r.x+r.w-5, r.y+r.h-5);
   }
 
   ctx.restore();
@@ -755,7 +823,7 @@ function drawEdge(e) {
   const tc  = themeColors();
 
   ctx.save();
-  ctx.strokeStyle = sel ? tc.accent : (e.color||'#888888');
+  ctx.strokeStyle = sel ? tc.accent : (e.color||'#707070');
   ctx.lineWidth   = sel ? 2 : 1.5;
   if (e.style==='dashed') ctx.setLineDash([6,4]);
   else if (e.style==='dotted') ctx.setLineDash([2,3]);
@@ -1443,62 +1511,66 @@ function syncNextId() {
   state.nextId=max;
 }
 
-// ─── Seed example ─────────────────────────────────────────────────────────────
+// ─── Seed example (Big Bank PLC — canonical C4 example) ─────────────────────
 function seed() {
+  // null color = use type default from C4_COLORS
   const c=state.diagrams.context;
-  const user  ={id:'s_1',type:'person',  color:'#1168bd',label:'Customer',        x:60, y:110,w:140,h:90,description:'A bank customer',technology:''};
-  const sys   ={id:'s_2',type:'system',  color:'#1168bd',label:'Internet Banking',x:280,y:110,w:160,h:90,description:'Online banking platform',technology:'Java/Spring'};
-  const ext1  ={id:'s_3',type:'external',color:'#999999',label:'Email System',    x:500,y:110,w:140,h:90,description:'Sends email notifications',technology:''};
-  const ext2  ={id:'s_4',type:'external',color:'#999999',label:'Mainframe',       x:280,y:270,w:160,h:90,description:'Core banking',technology:''};
+  const user  ={id:'s_1',type:'person',  color:null,label:'Personal Banking Customer', x:60, y:100,w:150,h:110,description:'A customer of the bank, with personal bank accounts.',technology:''};
+  const sys   ={id:'s_2',type:'system',  color:null,label:'Internet Banking System',   x:290,y:100,w:160,h:110,description:'Allows customers to view information about their bank accounts and make payments.',technology:''};
+  const ext1  ={id:'s_3',type:'external',color:null,label:'E-mail System',             x:520,y:100,w:150,h:110,description:'The internal Microsoft Exchange e-mail system.',technology:''};
+  const ext2  ={id:'s_4',type:'external',color:null,label:'Mainframe Banking System',  x:290,y:280,w:160,h:110,description:'Stores all of the core banking information about customers, accounts, transactions, etc.',technology:''};
   c.nodes.push(user,sys,ext1,ext2);
   c.edges.push(
-    {id:'s_5', from:'s_1',to:'s_2',label:'Uses',        technology:'HTTPS',   style:'solid', arrowType:'filled'},
-    {id:'s_6', from:'s_2',to:'s_3',label:'Sends email', technology:'SMTP',    style:'dashed',arrowType:'filled'},
-    {id:'s_7', from:'s_2',to:'s_4',label:'Reads/writes',technology:'TCP/IP',  style:'solid', arrowType:'filled'},
+    {id:'s_5', from:'s_1',to:'s_2',label:'Views account balances, and makes payments using', technology:'',      style:'solid', arrowType:'filled'},
+    {id:'s_6', from:'s_2',to:'s_3',label:'Sends e-mail using',                               technology:'SMTP',  style:'dashed',arrowType:'filled'},
+    {id:'s_7', from:'s_2',to:'s_4',label:'Gets account information from, and makes payments using', technology:'',style:'solid', arrowType:'filled'},
+    {id:'s_8', from:'s_3',to:'s_1',label:'Sends e-mails to',                                 technology:'',      style:'dashed',arrowType:'filled'},
   );
 
   const ct=state.diagrams.container;
-  const spa ={id:'s_10',type:'webapp',   color:'#1168bd',label:'Single-Page App',x:60, y:80, w:150,h:90,description:'Banking UI',technology:'React'};
-  const mob ={id:'s_11',type:'mobileapp',color:'#1168bd',label:'Mobile App',    x:60, y:220,w:150,h:90,description:'iOS/Android',technology:'Flutter'};
-  const api ={id:'s_12',type:'api',      color:'#1168bd',label:'API',           x:290,y:150,w:150,h:90,description:'REST API',technology:'Spring Boot'};
-  const db  ={id:'s_13',type:'database', color:'#1168bd',label:'Database',      x:290,y:310,w:150,h:90,description:'User data',technology:'PostgreSQL'};
-  const mf  ={id:'s_14',type:'external', color:'#999999',label:'Mainframe',     x:500,y:150,w:140,h:90,description:'Core banking',technology:''};
-  const mail={id:'s_15',type:'external', color:'#999999',label:'Email System',  x:500,y:310,w:140,h:90,description:'SMTP',technology:''};
-  const usr ={id:'s_16',type:'person',   color:'#888888',label:'Customer',      x:60, y:360,w:140,h:80,description:'',technology:''};
-  ct.nodes.push(spa,mob,api,db,mf,mail,usr);
+  const spa ={id:'s_10',type:'webapp',   color:null,label:'Single-Page Application',x:60, y:70, w:155,h:100,description:'Provides all of the Internet banking functionality to customers via their web browser.',technology:'JavaScript, Angular'};
+  const mob ={id:'s_11',type:'mobileapp',color:null,label:'Mobile App',             x:60, y:230,w:155,h:100,description:'Provides a limited subset of the Internet banking functionality to customers via their mobile device.',technology:'Xamarin'};
+  const apiC={id:'s_12',type:'api',      color:null,label:'API Application',        x:295,y:150,w:155,h:100,description:'Provides Internet banking functionality via a JSON/HTTPS API.',technology:'Java, Spring MVC'};
+  const db  ={id:'s_13',type:'database', color:null,label:'Database',               x:295,y:320,w:155,h:100,description:'Stores user registration information, hashed auth credentials, access logs, etc.',technology:'Oracle Database Schema'};
+  const mf  ={id:'s_14',type:'external', color:null,label:'Mainframe Banking System',x:525,y:150,w:155,h:100,description:'Stores all of the core banking information.',technology:''};
+  const mail={id:'s_15',type:'external', color:null,label:'E-mail System',          x:525,y:320,w:155,h:100,description:'The internal Microsoft Exchange e-mail system.',technology:'Microsoft Exchange'};
+  const usr ={id:'s_16',type:'person',   color:null,label:'Personal Banking Customer',x:60,y:370,w:155,h:100,description:'',technology:''};
+  ct.nodes.push(spa,mob,apiC,db,mf,mail,usr);
   ct.edges.push(
-    {id:'s_20',from:'s_10',to:'s_12',label:'API calls',  technology:'JSON/HTTPS',style:'solid', arrowType:'filled'},
-    {id:'s_21',from:'s_11',to:'s_12',label:'API calls',  technology:'JSON/HTTPS',style:'solid', arrowType:'filled'},
-    {id:'s_22',from:'s_12',to:'s_13',label:'Reads/writes',technology:'SQL',      style:'solid', arrowType:'filled'},
-    {id:'s_23',from:'s_12',to:'s_14',label:'Calls',      technology:'XML/HTTPS', style:'solid', arrowType:'filled'},
-    {id:'s_24',from:'s_12',to:'s_15',label:'Sends email',technology:'SMTP',      style:'dashed',arrowType:'filled'},
-    {id:'s_25',from:'s_16',to:'s_10',label:'Uses',       technology:'',          style:'solid', arrowType:'filled'},
-    {id:'s_26',from:'s_16',to:'s_11',label:'Uses',       technology:'',          style:'solid', arrowType:'filled'},
+    {id:'s_20',from:'s_10',to:'s_12',label:'Makes API calls to',  technology:'JSON/HTTPS',style:'solid', arrowType:'filled'},
+    {id:'s_21',from:'s_11',to:'s_12',label:'Makes API calls to',  technology:'JSON/HTTPS',style:'solid', arrowType:'filled'},
+    {id:'s_22',from:'s_12',to:'s_13',label:'Reads from and writes to',technology:'SQL/TCP',style:'solid', arrowType:'filled'},
+    {id:'s_23',from:'s_12',to:'s_14',label:'Makes API calls to',  technology:'XML/HTTPS', style:'solid', arrowType:'filled'},
+    {id:'s_24',from:'s_12',to:'s_15',label:'Sends e-mail using',  technology:'SMTP',      style:'dashed',arrowType:'filled'},
+    {id:'s_25',from:'s_16',to:'s_10',label:'Visits bigbank.com/ib using', technology:'HTTPS',style:'solid',arrowType:'filled'},
+    {id:'s_26',from:'s_16',to:'s_11',label:'Views account balances, and makes payments using', technology:'',style:'solid',arrowType:'filled'},
   );
 
   const cp=state.diagrams.component;
-  const ctrl={id:'s_30',type:'component',color:'#1168bd',label:'SignIn Controller', x:60, y:80, w:150,h:80,description:'Handles sign-in',technology:'Spring MVC'};
-  const sec ={id:'s_31',type:'component',color:'#1168bd',label:'Security Component',x:60, y:220,w:150,h:80,description:'Auth & JWT',technology:'Spring Security'};
-  const svc ={id:'s_32',type:'service',  color:'#27ae60',label:'Account Service',   x:280,y:150,w:150,h:80,description:'Account ops',technology:'Spring'};
-  const repo={id:'s_33',type:'repo',     color:'#8e44ad',label:'Account Repo',      x:280,y:290,w:150,h:80,description:'JPA repository',technology:'JPA'};
-  const mf2 ={id:'s_34',type:'external', color:'#999999',label:'Mainframe',         x:490,y:150,w:140,h:80,description:'',technology:''};
-  const dbc ={id:'s_35',type:'external', color:'#999999',label:'Database',          x:490,y:290,w:140,h:80,description:'PostgreSQL',technology:''};
-  cp.nodes.push(ctrl,sec,svc,repo,mf2,dbc);
+  const ctrl={id:'s_30',type:'component',color:null,label:'Sign In Controller',    x:50, y:70, w:155,h:90,description:'Allows users to sign in to the Internet Banking System.',technology:'Spring MVC Rest Controller'};
+  const sec ={id:'s_31',type:'component',color:null,label:'Security Component',    x:50, y:220,w:155,h:90,description:'Provides functionality related to signing in, changing passwords, etc.',technology:'Spring Bean'};
+  const svc ={id:'s_32',type:'component',color:null,label:'Accounts Summary Ctr',  x:280,y:145,w:155,h:90,description:'Provides customers with a summary of their bank accounts.',technology:'Spring MVC Rest Controller'};
+  const repo={id:'s_33',type:'component',color:null,label:'Accounts Repository',   x:280,y:290,w:155,h:90,description:'Provides access to account information from the database.',technology:'Spring Data'};
+  const mf2 ={id:'s_34',type:'external', color:null,label:'Mainframe Banking System',x:500,y:145,w:155,h:90,description:'',technology:''};
+  const dbc ={id:'s_35',type:'external', color:null,label:'Database',              x:500,y:290,w:155,h:90,description:'',technology:''};
+  const emailCmp={id:'s_36',type:'component',color:null,label:'E-mail Component',  x:500,y:70, w:155,h:90,description:'Sends e-mails to users.',technology:'Spring Bean'};
+  cp.nodes.push(ctrl,sec,svc,repo,mf2,dbc,emailCmp);
   cp.edges.push(
-    {id:'s_40',from:'s_30',to:'s_31',label:'Uses',        technology:'',       style:'solid', arrowType:'filled'},
-    {id:'s_41',from:'s_30',to:'s_32',label:'Uses',        technology:'',       style:'solid', arrowType:'filled'},
-    {id:'s_42',from:'s_32',to:'s_33',label:'Uses',        technology:'',       style:'solid', arrowType:'filled'},
-    {id:'s_43',from:'s_32',to:'s_34',label:'Reads',       technology:'XML',    style:'solid', arrowType:'filled'},
-    {id:'s_44',from:'s_33',to:'s_35',label:'Reads/writes',technology:'SQL',    style:'solid', arrowType:'filled'},
+    {id:'s_40',from:'s_30',to:'s_31',label:'Uses',           technology:'',    style:'solid', arrowType:'filled'},
+    {id:'s_41',from:'s_30',to:'s_32',label:'Uses',           technology:'',    style:'solid', arrowType:'filled'},
+    {id:'s_42',from:'s_32',to:'s_33',label:'Uses',           technology:'',    style:'solid', arrowType:'filled'},
+    {id:'s_43',from:'s_32',to:'s_34',label:'Makes API calls to', technology:'XML/HTTPS', style:'solid', arrowType:'filled'},
+    {id:'s_44',from:'s_33',to:'s_35',label:'Reads from and writes to', technology:'SQL/TCP', style:'solid', arrowType:'filled'},
+    {id:'s_45',from:'s_30',to:'s_36',label:'Sends e-mail using', technology:'', style:'dashed', arrowType:'filled'},
   );
 
   const cd=state.diagrams.code;
-  const ifc={id:'s_50',type:'interface',color:'#16a085',label:'IAccountService',  x:200,y:60, w:160,h:80,description:'',technology:''};
-  const cl1={id:'s_51',type:'class',    color:'#2c3e50',label:'AccountServiceImpl',x:200,y:210,w:160,h:80,description:'',technology:''};
-  const cl2={id:'s_52',type:'class',    color:'#2c3e50',label:'AccountController', x:420,y:60, w:160,h:80,description:'REST',technology:''};
-  const cl3={id:'s_53',type:'class',    color:'#2c3e50',label:'AccountRepository', x:420,y:210,w:160,h:80,description:'JPA',technology:''};
-  const ent={id:'s_54',type:'class',    color:'#2980b9',label:'Account',           x:200,y:360,w:160,h:80,description:'Domain entity',technology:''};
-  const enm={id:'s_55',type:'enum',     color:'#8e44ad',label:'AccountType',       x:420,y:360,w:160,h:80,description:'CHECKING, SAVINGS',technology:''};
+  const ifc={id:'s_50',type:'interface',color:null,label:'IAccountService',   x:200,y:60, w:160,h:85,description:'',technology:''};
+  const cl1={id:'s_51',type:'class',    color:null,label:'AccountServiceImpl', x:200,y:210,w:160,h:85,description:'',technology:''};
+  const cl2={id:'s_52',type:'class',    color:null,label:'AccountController',  x:420,y:60, w:160,h:85,description:'REST',technology:''};
+  const cl3={id:'s_53',type:'class',    color:null,label:'AccountRepository',  x:420,y:210,w:160,h:85,description:'JPA Repository',technology:''};
+  const ent={id:'s_54',type:'class',    color:null,label:'Account',            x:200,y:360,w:160,h:85,description:'Domain entity',technology:''};
+  const enm={id:'s_55',type:'enum',     color:null,label:'AccountType',        x:420,y:360,w:160,h:85,description:'CHECKING, SAVINGS',technology:''};
   cd.nodes.push(ifc,cl1,cl2,cl3,ent,enm);
   cd.edges.push(
     {id:'s_60',from:'s_51',to:'s_50',label:'implements',technology:'',style:'dashed',arrowType:'open'},
@@ -1523,7 +1595,7 @@ try {
   fitView();
   render();
   updateProperties();
-  console.log('[C4] v2026-05-04c initialised — nodes:', getDiagram().nodes.length);
+  console.log('[C4] v2026-05-04d initialised — nodes:', getDiagram().nodes.length);
 } catch(err) {
   const banner = document.getElementById('error-banner');
   const msg    = document.getElementById('error-msg');
