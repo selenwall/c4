@@ -362,7 +362,7 @@ body {
   <span id="status-nodes">Nodes: 0</span>
   <span id="status-edges">Edges: 0</span>
   <span id="status-hint">Drag palette items · Double-tap to rename · Pinch to zoom</span>
-  <span id="version-stamp">v2026-05-04d</span>
+  <span id="version-stamp">v2026-05-04e</span>
 </div>
 
 <div id="context-menu">
@@ -416,49 +416,19 @@ const safeStorage = {
   set(k, v) { try { localStorage.setItem(k, v); } catch {} }
 };
 
-// ─── Official C4 color palette ────────────────────────────────────────────────
-// Source: C4-PlantUML stdlib (c4model.com reference implementation)
-const C4_COLORS = {
-  person:    { bg:'#08427B', border:'#073B6F' },
-  system:    { bg:'#1168BD', border:'#3C7FC0' },
-  external:  { bg:'#999999', border:'#8A8A8A' },
-  extperson: { bg:'#686868', border:'#8A8A8A' },
-  // Containers
-  webapp:    { bg:'#438DD5', border:'#3C7FC0' },
-  mobileapp: { bg:'#438DD5', border:'#3C7FC0' },
-  api:       { bg:'#438DD5', border:'#3C7FC0' },
-  database:  { bg:'#438DD5', border:'#3C7FC0' },
-  queue:     { bg:'#438DD5', border:'#3C7FC0' },
-  // Components — light blue, use dark text
-  component: { bg:'#85BBF0', border:'#78A8D8' },
-  service:   { bg:'#85BBF0', border:'#78A8D8' },
-  repo:      { bg:'#85BBF0', border:'#78A8D8' },
-  facade:    { bg:'#85BBF0', border:'#78A8D8' },
-  factory:   { bg:'#85BBF0', border:'#78A8D8' },
-  // Code
-  class:     { bg:'#2C3E50', border:'#1A252F' },
-  interface: { bg:'#16A085', border:'#0E6655' },
-  abstract:  { bg:'#2980B9', border:'#1A5276' },
-  enum:      { bg:'#8E44AD', border:'#6C3483' },
-  package:   { bg:'#555555', border:'#444444' },
-};
+// ─── C4 sketch style constants ───────────────────────────────────────────────
+const SK_FILL    = '#FFFFFF';
+const SK_FILL_EX = '#F5F5F5';  // external / secondary elements
+const SK_BORDER  = '#666666';
+const SK_BORDER_EX = '#AAAAAA';
+const SK_TEXT    = '#111111';
+const SK_STEREO  = '#555555';
+const SK_DESC    = '#777777';
+const SK_SEL     = '#0969DA';
 
-function c4BgColor(n) {
-  const c = C4_COLORS[n.type];
-  return n.color || (c ? c.bg : '#1168BD');
-}
-function c4BorderColor(n) {
-  const override = n.color;
-  if (override) return darken(override, 30);
-  const c = C4_COLORS[n.type];
-  return c ? c.border : '#3C7FC0';
-}
-// Luminance-based text color: dark bg → white text, light bg → dark text
-function c4TextColor(bgHex) {
-  const c = parseInt(bgHex.replace('#',''), 16);
-  const lum = (0.299*((c>>16)&0xff) + 0.587*((c>>8)&0xff) + 0.114*(c&0xff)) / 255;
-  return lum > 0.55 ? '#23292F' : '#FFFFFF';
-}
+function skFill(n)   { return isExternal(n) ? SK_FILL_EX : SK_FILL; }
+function skBorder(n) { return isExternal(n) ? SK_BORDER_EX : SK_BORDER; }
+function isExternal(n) { return n.type === 'external' || n.type === 'extperson'; }
 
 // ─── Level config ────────────────────────────────────────────────────────────
 const LEVELS = ['context','container','component','code'];
@@ -676,82 +646,74 @@ function wrapText(c, text, maxW) {
 }
 
 function drawNode(n) {
-  const r   = nodeRect(n);
+  const r      = nodeRect(n);
   const sel    = state.selection.includes(n.id);
   const hov    = state.hovered === n.id;
-  const bg     = c4BgColor(n);
-  const border = c4BorderColor(n);
-  const fg     = c4TextColor(bg);                  // white or dark depending on luminance
-  const fgA    = fg === '#FFFFFF' ? 'rgba(255,255,255,0.7)'  : 'rgba(35,41,47,0.65)';
-  const fgB    = fg === '#FFFFFF' ? 'rgba(255,255,255,0.55)' : 'rgba(35,41,47,0.5)';
+  const fill   = skFill(n);
+  const border = sel ? SK_SEL : skBorder(n);
+  const lw     = sel ? 2.5 : 1.5;
   const cx     = r.x + r.w / 2;
 
   ctx.save();
-  if (sel) { ctx.shadowColor = '#0969da'; ctx.shadowBlur = 16; }
-  else if (hov) { ctx.shadowColor = 'rgba(0,0,0,0.2)'; ctx.shadowBlur = 10; }
+  if (sel) { ctx.shadowColor = SK_SEL; ctx.shadowBlur = 12; }
+  else if (hov) { ctx.shadowColor = 'rgba(0,0,0,0.15)'; ctx.shadowBlur = 8; }
 
-  // ── Person: C4 style — rounded box with head+body icon ────────────────────
+  // ── Person: sketch style — head circle + body arc, text below ─────────────
   if (n.type === 'person' || n.type === 'extperson') {
-    ctx.fillStyle = bg; ctx.strokeStyle = border;
-    ctx.lineWidth = sel ? 2.5 : 1.5;
-    roundRect(ctx, r.x, r.y, r.w, r.h, 6);
+    ctx.strokeStyle = border; ctx.lineWidth = lw;
+
+    const headR  = Math.min(r.w * 0.15, 14);
+    const headCY = r.y + headR + 4;
+    ctx.fillStyle = fill;
+    ctx.beginPath(); ctx.arc(cx, headCY, headR, 0, Math.PI*2);
     ctx.fill(); ctx.stroke();
+
+    const bodyR = headR * 1.6;
+    const bodyY = headCY + headR + 2;
+    ctx.beginPath(); ctx.arc(cx, bodyY, bodyR, Math.PI, 0); ctx.stroke();
+
     ctx.shadowBlur = 0;
+    const figBottom = bodyY + bodyR;
+    const stereo    = n.stereotype || STEREO[n.type] || 'Person';
+    const nameLines = wrapText(ctx, n.label||'Person', r.w - 8);
+    const descLines = n.description ? wrapText(ctx, n.description, r.w - 8).slice(0, 2) : [];
 
-    // Person icon (white/dark silhouette)
-    const iconH  = r.h * 0.42;
-    const headR  = Math.min(r.w * 0.13, iconH * 0.38);
-    const headCY = r.y + iconH * 0.36;
-    const bodyR  = headR * 1.5;
-    const bodyY  = headCY + headR + 2;
-
-    ctx.fillStyle   = fg === '#FFFFFF' ? 'rgba(255,255,255,0.85)' : 'rgba(35,41,47,0.7)';
-    ctx.strokeStyle = fg === '#FFFFFF' ? 'rgba(255,255,255,0.3)'  : 'rgba(35,41,47,0.2)';
-    ctx.lineWidth   = 0.5;
-
-    ctx.beginPath(); ctx.arc(cx, headCY, headR, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, bodyY, bodyR, Math.PI, 0);    ctx.fill(); ctx.stroke();
-
-    // Text block below icon
-    const stereo   = n.stereotype || STEREO[n.type] || 'Person';
-    const textTop  = r.y + iconH + 4;
-    const textH    = r.h - iconH - 8;
-    const nameLines = wrapText(ctx, n.label||'Person', r.w-16);
-    const tech  = n.technology ? `[${n.technology}]` : '';
-    const descL = n.description ? wrapText(ctx, n.description, r.w-14).slice(0,2) : [];
-    const total = 11 + nameLines.length*14 + (tech?12:0) + (descL.length?descL.length*11+2:0);
-    let ty = textTop + Math.max(0, (textH - total) / 2);
-
+    let ty = figBottom + 6;
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillStyle = fgA; ctx.font = 'italic 10px -apple-system,sans-serif';
-    ctx.fillText(`«${stereo}»`, cx, ty); ty += 13;
 
-    ctx.fillStyle = fg; ctx.font = 'bold 12px -apple-system,sans-serif';
+    ctx.fillStyle = SK_TEXT; ctx.font = 'bold 12px -apple-system,sans-serif';
     for (const l of nameLines) { ctx.fillText(l, cx, ty); ty += 14; }
 
-    if (tech) { ctx.fillStyle = fgA; ctx.font = 'italic 10px -apple-system,sans-serif'; ctx.fillText(tech, cx, ty); ty += 12; }
-    if (descL.length) { ctx.fillStyle = fgB; ctx.font = '10px -apple-system,sans-serif'; for (const d of descL) { ctx.fillText(d, cx, ty); ty += 11; } }
+    ctx.fillStyle = SK_STEREO; ctx.font = 'italic 10px -apple-system,sans-serif';
+    ctx.fillText(`[${stereo}]`, cx, ty); ty += 12;
 
-    if (canDrillDown(n)) { ctx.fillStyle = fgB; ctx.font = '9px monospace'; ctx.textAlign='right'; ctx.fillText('▶▶', r.x+r.w-5, r.y+r.h-5); }
+    if (descLines.length) {
+      ctx.fillStyle = SK_DESC; ctx.font = '10px -apple-system,sans-serif';
+      for (const d of descLines) { ctx.fillText(d, cx, ty); ty += 11; }
+    }
+
+    if (canDrillDown(n)) {
+      ctx.fillStyle = SK_DESC; ctx.font = '9px monospace';
+      ctx.textAlign = 'right'; ctx.fillText('▶▶', r.x + r.w - 5, r.y + r.h - 5);
+    }
     ctx.restore(); return;
   }
 
   // ── Database (cylinder) ───────────────────────────────────────────────────
   if (n.type === 'database') {
-    ctx.fillStyle = bg; ctx.strokeStyle = border; ctx.lineWidth = sel ? 2.5 : 1.5;
+    ctx.fillStyle = fill; ctx.strokeStyle = border; ctx.lineWidth = lw;
     const ry = r.h * 0.13;
     ctx.beginPath();
     ctx.ellipse(cx, r.y+ry, r.w/2, ry, 0, Math.PI, 0);
     ctx.lineTo(r.x+r.w, r.y+r.h-ry);
     ctx.ellipse(cx, r.y+r.h-ry, r.w/2, ry, 0, 0, Math.PI);
     ctx.closePath(); ctx.fill(); ctx.stroke();
-    // top ellipse outline
     ctx.beginPath(); ctx.ellipse(cx, r.y+ry, r.w/2, ry, 0, 0, Math.PI*2); ctx.stroke();
     ctx.shadowBlur = 0;
   }
   // ── Queue (horizontal cylinder) ─────────────────────────────────────────
   else if (n.type === 'queue') {
-    ctx.fillStyle = bg; ctx.strokeStyle = border; ctx.lineWidth = sel ? 2.5 : 1.5;
+    ctx.fillStyle = fill; ctx.strokeStyle = border; ctx.lineWidth = lw;
     const rx = r.w * 0.12;
     ctx.beginPath();
     ctx.ellipse(r.x+rx, r.y+r.h/2, rx, r.h/2, 0, Math.PI/2, Math.PI*1.5);
@@ -761,54 +723,66 @@ function drawNode(n) {
     ctx.beginPath(); ctx.ellipse(r.x+rx, r.y+r.h/2, rx, r.h/2, 0, 0, Math.PI*2); ctx.stroke();
     ctx.shadowBlur = 0;
   }
-  // ── Interface (dashed border) ────────────────────────────────────────────
-  else if (n.type === 'interface') {
-    ctx.fillStyle = bg; ctx.strokeStyle = border; ctx.lineWidth = sel ? 2.5 : 1.5;
-    ctx.setLineDash([6,3]); roundRect(ctx, r.x, r.y, r.w, r.h, 8);
-    ctx.fill(); ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur = 0;
+  // ── Component: UML notch tabs on left side ────────────────────────────────
+  else if (['component','service','repo','facade','factory'].includes(n.type)) {
+    ctx.fillStyle = fill; ctx.strokeStyle = border; ctx.lineWidth = lw;
+    roundRect(ctx, r.x, r.y, r.w, r.h, 4); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+    const tabW = Math.min(14, r.w * 0.14), tabH = 7, tabGap = 6;
+    const tab1Y = r.y + r.h/2 - tabH - tabGap/2;
+    const tab2Y = r.y + r.h/2 + tabGap/2;
+    ctx.fillStyle = fill;
+    ctx.fillRect(r.x - tabW/2, tab1Y, tabW, tabH);
+    ctx.fillRect(r.x - tabW/2, tab2Y, tabW, tabH);
+    ctx.strokeRect(r.x - tabW/2, tab1Y, tabW, tabH);
+    ctx.strokeRect(r.x - tabW/2, tab2Y, tabW, tabH);
+  }
+  // ── Interface / abstract: dashed border ──────────────────────────────────
+  else if (n.type === 'interface' || n.type === 'abstract') {
+    ctx.fillStyle = fill; ctx.strokeStyle = border; ctx.lineWidth = lw;
+    ctx.setLineDash([6,3]);
+    roundRect(ctx, r.x, r.y, r.w, r.h, 4); ctx.fill(); ctx.stroke();
+    ctx.setLineDash([]); ctx.shadowBlur = 0;
   }
   // ── Standard rounded rectangle ───────────────────────────────────────────
   else {
-    ctx.fillStyle = bg; ctx.strokeStyle = border; ctx.lineWidth = sel ? 2.5 : 1.5;
-    roundRect(ctx, r.x, r.y, r.w, r.h, 6); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.fillStyle = fill; ctx.strokeStyle = border; ctx.lineWidth = lw;
+    roundRect(ctx, r.x, r.y, r.w, r.h, 4); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
   }
 
   // ── Text layout (all non-person) ─────────────────────────────────────────
-  // Stereotype — italic, small, top-center
   const stereo    = n.stereotype || STEREO[n.type] || n.type;
   const tech      = n.technology ? `[${n.technology}]` : '';
-  const nameLines = wrapText(ctx, n.label||'Untitled', r.w-16);
-  const descLines = n.description ? wrapText(ctx, n.description, r.w-14).slice(0,3) : [];
+  const nameLines = wrapText(ctx, n.label||'Untitled', r.w - 16);
+  const descLines = n.description ? wrapText(ctx, n.description, r.w - 14).slice(0, 3) : [];
 
-  const lineH   = 14, techH = tech ? 13 : 0, descH = descLines.length * 11;
-  const total   = 13 + nameLines.length*lineH + techH + (descLines.length ? descH+3 : 0);
-  const padTop  = (n.type==='database'||n.type==='queue') ? 6 : 6;
-  let ty = r.y + padTop + Math.max(0, (r.h - padTop*2 - total) / 2);
+  const lineH = 14, techH = tech ? 12 : 0, descH = descLines.length * 11;
+  const total = 12 + nameLines.length*lineH + techH + (descLines.length ? descH+3 : 0);
+  let ty = r.y + 6 + Math.max(0, (r.h - 12 - total) / 2);
 
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
 
-  // «stereotype» italic small
-  ctx.fillStyle = fgA; ctx.font = 'italic 10px -apple-system,sans-serif';
-  ctx.fillText(`«${stereo}»`, cx, ty); ty += 14;
+  ctx.fillStyle = SK_STEREO; ctx.font = 'italic 10px -apple-system,sans-serif';
+  ctx.fillText(`[${stereo}]`, cx, ty); ty += 13;
 
-  // Name bold
-  ctx.fillStyle = fg; ctx.font = 'bold 13px -apple-system,sans-serif';
+  ctx.fillStyle = SK_TEXT; ctx.font = 'bold 12px -apple-system,sans-serif';
   for (const l of nameLines) { ctx.fillText(l, cx, ty); ty += lineH; }
 
-  // [Technology] italic
-  if (tech) { ctx.fillStyle = fgA; ctx.font = 'italic 10px -apple-system,sans-serif'; ctx.fillText(tech, cx, ty); ty += techH; }
+  if (tech) {
+    ctx.fillStyle = SK_STEREO; ctx.font = 'italic 10px -apple-system,sans-serif';
+    ctx.fillText(tech, cx, ty); ty += techH;
+  }
 
-  // Description small
   if (descLines.length) {
     ty += 3;
-    ctx.fillStyle = fgB; ctx.font = '10px -apple-system,sans-serif';
+    ctx.fillStyle = SK_DESC; ctx.font = '10px -apple-system,sans-serif';
     for (const d of descLines) { ctx.fillText(d, cx, ty); ty += 11; }
   }
 
-  // Drill-down badge
   if (canDrillDown(n)) {
-    ctx.fillStyle = fgB; ctx.font = '9px monospace';
-    ctx.textAlign = 'right'; ctx.fillText('▶▶', r.x+r.w-5, r.y+r.h-5);
+    ctx.fillStyle = SK_DESC; ctx.font = '9px monospace';
+    ctx.textAlign = 'right'; ctx.fillText('▶▶', r.x + r.w - 5, r.y + r.h - 5);
   }
 
   ctx.restore();
@@ -820,13 +794,16 @@ function drawEdge(e) {
   if (!fn||!tn) return;
   const p1 = edgeEndpoint(tn, fn), p2 = edgeEndpoint(fn, tn);
   const sel = state.selection.includes(e.id);
-  const tc  = themeColors();
 
   ctx.save();
-  ctx.strokeStyle = sel ? tc.accent : (e.color||'#707070');
+  const lineColor = sel ? SK_SEL : (e.color || SK_BORDER);
+  ctx.strokeStyle = lineColor;
   ctx.lineWidth   = sel ? 2 : 1.5;
-  if (e.style==='dashed') ctx.setLineDash([6,4]);
-  else if (e.style==='dotted') ctx.setLineDash([2,3]);
+
+  // Default: dashed (sketch style); explicit 'solid' overrides
+  if (e.style === 'solid') ctx.setLineDash([]);
+  else if (e.style === 'dotted') ctx.setLineDash([2,3]);
+  else ctx.setLineDash([6,4]);
 
   ctx.beginPath();
   if (e.curved) {
@@ -837,18 +814,21 @@ function drawEdge(e) {
   }
   ctx.stroke(); ctx.setLineDash([]);
 
-  // Arrowhead
+  // Open arrowhead (V-shape, not filled triangle)
   const dx=p2.x-p1.x, dy=p2.y-p1.y, len=Math.hypot(dx,dy);
   if (len > 1) {
     const ux=dx/len, uy=dy/len, al=10, aw=5;
     const ax=p2.x-ux*al, ay=p2.y-uy*al;
-    ctx.fillStyle = ctx.strokeStyle;
+    ctx.strokeStyle = lineColor; ctx.lineWidth = sel ? 2 : 1.5;
     ctx.beginPath();
-    ctx.moveTo(p2.x,p2.y);
-    ctx.lineTo(ax-uy*aw, ay+ux*aw);
+    ctx.moveTo(ax-uy*aw, ay+ux*aw);
+    ctx.lineTo(p2.x, p2.y);
     ctx.lineTo(ax+uy*aw, ay-ux*aw);
-    ctx.closePath();
-    if (e.arrowType==='open') ctx.stroke(); else ctx.fill();
+    if (e.arrowType === 'filled') {
+      ctx.closePath(); ctx.fillStyle = lineColor; ctx.fill();
+    } else {
+      ctx.stroke();
+    }
   }
 
   // Label
@@ -857,12 +837,12 @@ function drawEdge(e) {
     ctx.font = '11px -apple-system,sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const mw = ctx.measureText(e.label).width;
-    ctx.fillStyle = tc.edgeLabel;
+    ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(mx-mw/2-3, my-7, mw+6, 14);
-    ctx.fillStyle = tc.edgeLabelFg;
+    ctx.fillStyle = SK_TEXT;
     ctx.fillText(e.label, mx, my);
     if (e.technology) {
-      ctx.fillStyle = getVar('--text-muted');
+      ctx.fillStyle = SK_DESC;
       ctx.font = 'italic 10px sans-serif';
       ctx.fillText(`[${e.technology}]`, mx, my+13);
     }
@@ -1595,7 +1575,7 @@ try {
   fitView();
   render();
   updateProperties();
-  console.log('[C4] v2026-05-04d initialised — nodes:', getDiagram().nodes.length);
+  console.log('[C4] v2026-05-04e initialised — nodes:', getDiagram().nodes.length);
 } catch(err) {
   const banner = document.getElementById('error-banner');
   const msg    = document.getElementById('error-msg');
