@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 Model Editor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* Header */
+  #header { background: #16213e; border-bottom: 1px solid #0f3460; padding: 8px 16px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+  #header h1 { font-size: 16px; font-weight: 600; color: #e94560; letter-spacing: 1px; }
+  .level-tabs { display: flex; gap: 4px; }
+  .level-tab { padding: 6px 14px; border-radius: 4px; border: 1px solid #0f3460; cursor: pointer; font-size: 12px; font-weight: 500; background: transparent; color: #888; transition: all 0.2s; }
+  .level-tab.active { background: #0f3460; color: #fff; border-color: #4a90d9; }
+  .level-tab:hover:not(.active) { border-color: #4a90d9; color: #ccc; }
+  #header-right { margin-left: auto; display: flex; gap: 8px; }
+  .btn { padding: 5px 12px; border-radius: 4px; border: 1px solid #0f3460; cursor: pointer; font-size: 12px; background: #0f3460; color: #ccc; transition: all 0.2s; }
+  .btn:hover { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+  .btn.danger { border-color: #e94560; color: #e94560; background: transparent; }
+  .btn.danger:hover { background: #e94560; color: #fff; }
+  .btn.primary { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+  .btn.primary:hover { background: #357abd; }
+
+  /* Main layout */
+  #main { display: flex; flex: 1; overflow: hidden; }
+
+  /* Sidebar */
+  #sidebar { width: 220px; background: #16213e; border-right: 1px solid #0f3460; display: flex; flex-direction: column; flex-shrink: 0; }
+  #sidebar-header { padding: 12px; border-bottom: 1px solid #0f3460; font-size: 11px; font-weight: 600; color: #888; letter-spacing: 1px; text-transform: uppercase; }
+  #shape-palette { padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .shape-item { padding: 8px 10px; border-radius: 4px; border: 1px solid #0f3460; cursor: grab; font-size: 12px; display: flex; align-items: center; gap: 8px; transition: all 0.2s; user-select: none; }
+  .shape-item:hover { border-color: #4a90d9; background: #0f3460; }
+  .shape-item:active { cursor: grabbing; }
+  .shape-icon { width: 20px; height: 16px; display: flex; align-items: center; justify-content: center; }
+
+  .sidebar-section { padding: 8px; border-top: 1px solid #0f3460; }
+  .sidebar-section-title { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+
+  /* Canvas area */
+  #canvas-container { flex: 1; position: relative; overflow: hidden; background: #0d1117; }
+  #canvas { position: absolute; top: 0; left: 0; cursor: default; }
+  #canvas.panning { cursor: grab; }
+  #canvas.panning-active { cursor: grabbing; }
+
+  /* Property panel */
+  #properties { width: 240px; background: #16213e; border-left: 1px solid #0f3460; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+  #properties-header { padding: 12px; border-bottom: 1px solid #0f3460; font-size: 11px; font-weight: 600; color: #888; letter-spacing: 1px; text-transform: uppercase; }
+  #properties-content { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .prop-group { display: flex; flex-direction: column; gap: 4px; }
+  .prop-label { font-size: 11px; color: #888; }
+  .prop-input { background: #0d1117; border: 1px solid #0f3460; color: #e0e0e0; padding: 5px 8px; border-radius: 3px; font-size: 12px; width: 100%; }
+  .prop-input:focus { outline: none; border-color: #4a90d9; }
+  .prop-textarea { background: #0d1117; border: 1px solid #0f3460; color: #e0e0e0; padding: 5px 8px; border-radius: 3px; font-size: 12px; width: 100%; resize: vertical; min-height: 60px; font-family: inherit; }
+  .prop-textarea:focus { outline: none; border-color: #4a90d9; }
+  .prop-select { background: #0d1117; border: 1px solid #0f3460; color: #e0e0e0; padding: 5px 8px; border-radius: 3px; font-size: 12px; width: 100%; }
+  .prop-select:focus { outline: none; border-color: #4a90d9; }
+  .prop-color { display: flex; gap: 6px; align-items: center; }
+  .prop-color input[type=color] { width: 32px; height: 26px; padding: 1px; border: 1px solid #0f3460; border-radius: 3px; background: #0d1117; cursor: pointer; }
+  #no-selection { padding: 20px 12px; color: #555; font-size: 12px; text-align: center; }
+
+  /* Status bar */
+  #statusbar { background: #16213e; border-top: 1px solid #0f3460; padding: 4px 12px; font-size: 11px; color: #666; display: flex; gap: 16px; flex-shrink: 0; }
+
+  /* Context menu */
+  #context-menu { position: fixed; background: #16213e; border: 1px solid #0f3460; border-radius: 4px; padding: 4px 0; min-width: 160px; z-index: 1000; box-shadow: 0 4px 16px rgba(0,0,0,0.5); display: none; }
+  .ctx-item { padding: 6px 14px; font-size: 12px; cursor: pointer; }
+  .ctx-item:hover { background: #0f3460; }
+  .ctx-item.danger { color: #e94560; }
+  .ctx-separator { border-top: 1px solid #0f3460; margin: 4px 0; }
+
+  /* Modal */
+  #modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 2000; display: none; align-items: center; justify-content: center; }
+  #modal-overlay.open { display: flex; }
+  .modal { background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 20px; min-width: 360px; max-width: 560px; }
+  .modal h2 { font-size: 14px; margin-bottom: 16px; color: #4a90d9; }
+  .modal textarea { width: 100%; height: 120px; background: #0d1117; border: 1px solid #0f3460; color: #e0e0e0; padding: 8px; border-radius: 4px; font-size: 12px; font-family: monospace; }
+  .modal textarea:focus { outline: none; border-color: #4a90d9; }
+  .modal-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+  /* Minimap */
+  #minimap { position: absolute; bottom: 16px; right: 16px; border: 1px solid #0f3460; background: rgba(13,17,23,0.9); border-radius: 4px; }
+
+  /* Zoom controls */
+  #zoom-controls { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; align-items: center; background: rgba(22,33,62,0.9); border: 1px solid #0f3460; border-radius: 4px; padding: 4px 8px; }
+  #zoom-label { font-size: 11px; color: #888; min-width: 40px; text-align: center; }
+  .zoom-btn { background: none; border: none; color: #888; cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
+  .zoom-btn:hover { color: #fff; }
+
+  /* Selection box */
+  #selection-box { position: absolute; border: 1px dashed #4a90d9; background: rgba(74,144,217,0.08); pointer-events: none; display: none; }
+
+  /* Tooltip */
+  #tooltip { position: fixed; background: #0d1117; border: 1px solid #0f3460; padding: 4px 8px; border-radius: 3px; font-size: 11px; color: #ccc; pointer-events: none; z-index: 3000; display: none; }
+
+  /* Drill-down breadcrumb */
+  #breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 12px; flex-wrap: wrap; }
+  .bc-sep { color: #444; }
+  .bc-item { color: #4a90d9; cursor: pointer; }
+  .bc-item:hover { text-decoration: underline; }
+  .bc-current { color: #888; }
+
+  /* Legend */
+  #legend { position: absolute; top: 16px; right: 16px; background: rgba(22,33,62,0.9); border: 1px solid #0f3460; border-radius: 4px; padding: 8px 12px; font-size: 10px; color: #888; }
+  #legend div { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .legend-box { width: 12px; height: 10px; border-radius: 2px; border: 1px solid; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>C4 Editor</h1>
+  <div class="level-tabs">
+    <button class="level-tab active" data-level="context">L1 Context</button>
+    <button class="level-tab" data-level="container">L2 Container</button>
+    <button class="level-tab" data-level="component">L3 Component</button>
+    <button class="level-tab" data-level="code">L4 Code</button>
+  </div>
+  <div id="breadcrumb"></div>
+  <div id="header-right">
+    <button class="btn" id="btn-import">Import</button>
+    <button class="btn" id="btn-export">Export</button>
+    <button class="btn primary" id="btn-add-rel">Add Relation</button>
+    <button class="btn danger" id="btn-clear">Clear</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <div id="sidebar-header">Elements</div>
+    <div id="shape-palette"></div>
+  </div>
+
+  <div id="canvas-container">
+    <canvas id="canvas"></canvas>
+    <div id="selection-box"></div>
+    <div id="zoom-controls">
+      <button class="zoom-btn" id="btn-zoom-out">−</button>
+      <span id="zoom-label">100%</span>
+      <button class="zoom-btn" id="btn-zoom-in">+</button>
+      <button class="zoom-btn" id="btn-zoom-fit" title="Fit">⊡</button>
+    </div>
+    <canvas id="minimap" width="160" height="120"></canvas>
+    <div id="legend"></div>
+  </div>
+
+  <div id="properties">
+    <div id="properties-header">Properties</div>
+    <div id="properties-content">
+      <div id="no-selection">Select an element to edit its properties</div>
+    </div>
+  </div>
+</div>
+
+<div id="statusbar">
+  <span id="status-pos">x: 0  y: 0</span>
+  <span id="status-nodes">Nodes: 0</span>
+  <span id="status-edges">Edges: 0</span>
+  <span id="status-hint">Drag palette items to canvas · Double-click to edit label · Middle-drag or Space+drag to pan</span>
+</div>
+
+<div id="context-menu">
+  <div class="ctx-item" id="ctx-edit">Edit Label</div>
+  <div class="ctx-item" id="ctx-drill">Drill Down ▶</div>
+  <div class="ctx-separator"></div>
+  <div class="ctx-item" id="ctx-color">Change Color…</div>
+  <div class="ctx-item" id="ctx-duplicate">Duplicate</div>
+  <div class="ctx-separator"></div>
+  <div class="ctx-item danger" id="ctx-delete">Delete</div>
+</div>
+
+<div id="modal-overlay">
+  <div class="modal" id="modal">
+    <h2 id="modal-title">Import / Export</h2>
+    <textarea id="modal-textarea" spellcheck="false"></textarea>
+    <div class="modal-buttons">
+      <button class="btn" id="modal-cancel">Cancel</button>
+      <button class="btn primary" id="modal-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+// ─── Data Model ────────────────────────────────────────────────────────────
+const LEVELS = ['context','container','component','code'];
+
+const LEVEL_CONFIG = {
+  context: {
+    label: 'System Context',
+    shapes: [
+      { type:'person',    label:'Person',        color:'#1168bd', icon:'👤' },
+      { type:'system',    label:'System',        color:'#1168bd', icon:'⬛' },
+      { type:'external',  label:'External System',color:'#999999', icon:'⬚'  },
+    ],
+    legend: [
+      { color:'#1168bd', border:'#0d5094', label:'Internal System / Person' },
+      { color:'#999999', border:'#777',    label:'External System' },
+    ]
+  },
+  container: {
+    label: 'Container',
+    shapes: [
+      { type:'webapp',    label:'Web App',       color:'#1168bd', icon:'🌐' },
+      { type:'mobileapp', label:'Mobile App',    color:'#1168bd', icon:'📱' },
+      { type:'api',       label:'API / Service', color:'#1168bd', icon:'⚙️' },
+      { type:'database',  label:'Database',      color:'#1168bd', icon:'🗄️' },
+      { type:'queue',     label:'Message Queue', color:'#e67e22', icon:'📨' },
+      { type:'person',    label:'Person',        color:'#888888', icon:'👤' },
+      { type:'external',  label:'External',      color:'#999999', icon:'⬚'  },
+    ],
+    legend: [
+      { color:'#1168bd', border:'#0d5094', label:'Container' },
+      { color:'#e67e22', border:'#c0651a', label:'Message Queue' },
+      { color:'#999999', border:'#777',    label:'External' },
+    ]
+  },
+  component: {
+    label: 'Component',
+    shapes: [
+      { type:'component', label:'Component',     color:'#1168bd', icon:'🔷' },
+      { type:'service',   label:'Service',       color:'#27ae60', icon:'⚡' },
+      { type:'repo',      label:'Repository',    color:'#8e44ad', icon:'📦' },
+      { type:'facade',    label:'Facade',        color:'#16a085', icon:'🔲' },
+      { type:'factory',   label:'Factory',       color:'#d35400', icon:'🏭' },
+      { type:'external',  label:'External',      color:'#999999', icon:'⬚'  },
+    ],
+    legend: [
+      { color:'#1168bd', border:'#0d5094', label:'Component' },
+      { color:'#27ae60', border:'#1e8449', label:'Service' },
+      { color:'#8e44ad', border:'#6c3483', label:'Repository' },
+      { color:'#999999', border:'#777',    label:'External' },
+    ]
+  },
+  code: {
+    label: 'Code (Class)',
+    shapes: [
+      { type:'class',     label:'Class',         color:'#2c3e50', icon:'📄' },
+      { type:'interface', label:'Interface',     color:'#16a085', icon:'📋' },
+      { type:'abstract',  label:'Abstract',      color:'#2980b9', icon:'📝' },
+      { type:'enum',      label:'Enum',          color:'#8e44ad', icon:'🔢' },
+      { type:'package',   label:'Package',       color:'#666',    icon:'📦' },
+    ],
+    legend: [
+      { color:'#2c3e50', border:'#1a252f', label:'Class' },
+      { color:'#16a085', border:'#0e6655', label:'Interface' },
+      { color:'#2980b9', border:'#1a5276', label:'Abstract' },
+      { color:'#8e44ad', border:'#6c3483', label:'Enum' },
+    ]
+  }
+};
+
+// ─── State ─────────────────────────────────────────────────────────────────
+let state = {
+  currentLevel: 'context',
+  diagrams: { context:{nodes:[],edges:[]}, container:{nodes:[],edges:[]}, component:{nodes:[],edges:[]}, code:{nodes:[],edges:[]} },
+  view: { x:0, y:0, zoom:1 },
+  selection: [],
+  hovered: null,
+  drillStack: [],  // [{level, nodeId, nodeLabel}]
+  addingRelation: false,
+  relationStart: null,
+  nextId: 1,
+};
+
+function getDiagram() {
+  return state.diagrams[state.currentLevel];
+}
+
+function genId() { return 's_' + (state.nextId++); }
+
+// ─── Canvas setup ──────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const container = document.getElementById('canvas-container');
+const minimapCanvas = document.getElementById('minimap');
+const mctx = minimapCanvas.getContext('2d');
+
+function resize() {
+  canvas.width = container.clientWidth;
+  canvas.height = container.clientHeight;
+  render();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ─── Coordinate helpers ────────────────────────────────────────────────────
+function toWorld(sx, sy) {
+  return { x: (sx - state.view.x) / state.view.zoom, y: (sy - state.view.y) / state.view.zoom };
+}
+function toScreen(wx, wy) {
+  return { x: wx * state.view.zoom + state.view.x, y: wy * state.view.zoom + state.view.y };
+}
+
+// ─── Node geometry ─────────────────────────────────────────────────────────
+const NODE_W = 140, NODE_H = 80;
+
+function nodeRect(n) {
+  return { x: n.x, y: n.y, w: n.w || NODE_W, h: n.h || NODE_H };
+}
+
+function hitNode(wx, wy) {
+  const diag = getDiagram();
+  for (let i = diag.nodes.length - 1; i >= 0; i--) {
+    const r = nodeRect(diag.nodes[i]);
+    if (wx >= r.x && wx <= r.x + r.w && wy >= r.y && wy <= r.y + r.h) return diag.nodes[i];
+  }
+  return null;
+}
+
+function nodeCenter(n) {
+  const r = nodeRect(n);
+  return { x: r.x + r.w/2, y: r.y + r.h/2 };
+}
+
+// ─── Edge intersection with node border ────────────────────────────────────
+function edgeEndpoint(from, to) {
+  const rf = nodeRect(from);
+  const rt = nodeRect(to);
+  const fx = rf.x + rf.w/2, fy = rf.y + rf.h/2;
+  const tx = rt.x + rt.w/2, ty = rt.y + rt.h/2;
+  const dx = tx - fx, dy = ty - fy;
+  // intersect with target rect
+  const hw = rt.w/2, hh = rt.h/2;
+  let t = Infinity;
+  if (dx !== 0) { const t1 = (tx-hw-fx)/dx; if(t1>0&&t1<t){const y1=fy+t1*dy; if(Math.abs(y1-ty)<=hh) t=t1;} const t2=(tx+hw-fx)/dx; if(t2>0&&t2<t){const y2=fy+t2*dy; if(Math.abs(y2-ty)<=hh) t=t2;} }
+  if (dy !== 0) { const t3 = (ty-hh-fy)/dy; if(t3>0&&t3<t){const x3=fx+t3*dx; if(Math.abs(x3-tx)<=hw) t=t3;} const t4=(ty+hh-fy)/dy; if(t4>0&&t4<t){const x4=fx+t4*dx; if(Math.abs(x4-tx)<=hw) t=t4;} }
+  if (!isFinite(t)) return { x: tx, y: ty };
+  return { x: fx + t*dx, y: fy + t*dy };
+}
+
+// ─── Drawing ───────────────────────────────────────────────────────────────
+function drawRoundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x+r, y);
+  c.lineTo(x+w-r, y);
+  c.quadraticCurveTo(x+w, y, x+w, y+r);
+  c.lineTo(x+w, y+h-r);
+  c.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  c.lineTo(x+r, y+h);
+  c.quadraticCurveTo(x, y+h, x, y+h-r);
+  c.lineTo(x, y+r);
+  c.quadraticCurveTo(x, y, x+r, y);
+  c.closePath();
+}
+
+function drawDatabaseShape(c, x, y, w, h) {
+  const ry = h * 0.12;
+  c.beginPath();
+  c.ellipse(x+w/2, y+ry, w/2, ry, 0, Math.PI, 0);
+  c.lineTo(x+w, y+h-ry);
+  c.ellipse(x+w/2, y+h-ry, w/2, ry, 0, 0, Math.PI);
+  c.closePath();
+}
+
+function drawPersonShape(c, x, y, w, h) {
+  const cx = x + w/2;
+  const headR = Math.min(w, h) * 0.18;
+  const headY = y + headR + 4;
+  c.beginPath();
+  c.arc(cx, headY, headR, 0, Math.PI*2);
+  c.closePath();
+  c.fill();
+  c.stroke();
+  // body
+  c.beginPath();
+  c.moveTo(cx, headY + headR);
+  c.lineTo(cx, y + h - 12);
+  c.stroke();
+  // arms
+  c.beginPath();
+  c.moveTo(x+10, headY + headR + 10);
+  c.lineTo(x+w-10, headY + headR + 10);
+  c.stroke();
+  // legs
+  c.beginPath();
+  c.moveTo(cx, y+h-12);
+  c.lineTo(x+14, y+h-2);
+  c.moveTo(cx, y+h-12);
+  c.lineTo(x+w-14, y+h-2);
+  c.stroke();
+}
+
+function drawQueueShape(c, x, y, w, h) {
+  const rx = w * 0.12;
+  c.beginPath();
+  c.ellipse(x+rx, y+h/2, rx, h/2, 0, Math.PI/2, Math.PI*1.5);
+  c.lineTo(x+w-rx, y);
+  c.ellipse(x+w-rx, y+h/2, rx, h/2, 0, Math.PI*1.5, Math.PI/2);
+  c.closePath();
+}
+
+function lightenColor(hex, amount) {
+  const num = parseInt(hex.replace('#',''), 16);
+  const r = Math.min(255, (num>>16) + amount);
+  const g = Math.min(255, ((num>>8)&0xff) + amount);
+  const b = Math.min(255, (num&0xff) + amount);
+  return '#' + ((1<<24)|(r<<16)|(g<<8)|b).toString(16).slice(1);
+}
+
+function darkenColor(hex, amount) {
+  return lightenColor(hex, -amount);
+}
+
+function drawNode(n) {
+  const r = nodeRect(n);
+  const sel = state.selection.includes(n.id);
+  const hov = state.hovered === n.id;
+  const color = n.color || '#1168bd';
+  const darkColor = darkenColor(color, 40);
+
+  ctx.save();
+
+  // Shadow for selection/hover
+  if (sel || hov) {
+    ctx.shadowColor = sel ? '#4a90d9' : '#aaa';
+    ctx.shadowBlur = 12;
+  }
+
+  // Shape fill and stroke setup
+  ctx.fillStyle = color;
+  ctx.strokeStyle = darkColor;
+  ctx.lineWidth = sel ? 2.5 : 1.5;
+
+  if (n.type === 'person') {
+    drawPersonShape(ctx, r.x, r.y, r.w, r.h);
+    ctx.shadowBlur = 0;
+    return ctx.restore();
+  } else if (n.type === 'database') {
+    drawDatabaseShape(ctx, r.x, r.y, r.w, r.h);
+  } else if (n.type === 'queue') {
+    drawQueueShape(ctx, r.x, r.y, r.w, r.h);
+  } else if (n.type === 'interface') {
+    // Lollipop / dashed rect
+    ctx.setLineDash([5,3]);
+    drawRoundRect(ctx, r.x, r.y, r.w, r.h, 8);
+    ctx.setLineDash([]);
+  } else if (n.type === 'package') {
+    drawRoundRect(ctx, r.x, r.y, r.w, r.h, 4);
+    ctx.fill();
+    ctx.fillStyle = lightenColor(color, 30);
+    ctx.fillRect(r.x+2, r.y+2, r.w*0.4, 10);
+  } else if (n.type === 'abstract') {
+    drawRoundRect(ctx, r.x, r.y, r.w, r.h, 8);
+  } else {
+    drawRoundRect(ctx, r.x, r.y, r.w, r.h, 6);
+  }
+
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Stereotype tag strip at top
+  const tagH = 18;
+  ctx.fillStyle = darkenColor(color, 25);
+  if (n.type !== 'person' && n.type !== 'database' && n.type !== 'queue') {
+    ctx.save();
+    ctx.clip();
+    ctx.beginPath();
+    if (n.type === 'interface') { ctx.setLineDash([5,3]); drawRoundRect(ctx,r.x,r.y,r.w,tagH*1.5,8); ctx.setLineDash([]); }
+    else drawRoundRect(ctx, r.x, r.y, r.w, tagH+4, 6);
+    ctx.fillRect(r.x, r.y, r.w, tagH);
+    ctx.restore();
+  }
+
+  // Stereotype label
+  const stereoMap = {
+    person:'Person', system:'Software System', external:'External System',
+    webapp:'Web App', mobileapp:'Mobile App', api:'API', database:'Database',
+    queue:'Message Queue', component:'Component', service:'Service',
+    repo:'Repository', facade:'Facade', factory:'Factory',
+    class:'Class', interface:'Interface', abstract:'Abstract Class',
+    enum:'Enumeration', package:'Package'
+  };
+  const stereo = n.stereotype || stereoMap[n.type] || n.type;
+
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = `10px -apple-system, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (n.type !== 'person') {
+    ctx.fillText(`«${stereo}»`, r.x + r.w/2, r.y + tagH/2);
+  }
+
+  // Main label
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold 13px -apple-system, sans-serif`;
+  const labelLines = wrapText(ctx, n.label || 'Untitled', r.w - 16);
+  const descLines = n.description ? wrapText(ctx, n.description, r.w - 12) : [];
+  const tech = n.technology ? `[${n.technology}]` : '';
+
+  let textY = r.y + (n.type === 'person' ? r.h * 0.6 : tagH + 8);
+  const totalTextH = labelLines.length * 15 + (descLines.length > 0 ? 4 + descLines.length * 11 : 0) + (tech ? 12 : 0);
+  const availH = r.h - (n.type === 'person' ? r.h*0.6 : tagH + 8) - 6;
+  textY = r.y + (n.type === 'person' ? r.h * 0.6 : tagH + 8) + Math.max(0, (availH - totalTextH) / 2);
+
+  for (const line of labelLines) {
+    ctx.fillText(line, r.x + r.w/2, textY + 7);
+    textY += 15;
+  }
+
+  if (tech) {
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.font = `italic 10px -apple-system, sans-serif`;
+    ctx.fillText(tech, r.x + r.w/2, textY + 6);
+    textY += 12;
+  }
+
+  if (descLines.length > 0) {
+    textY += 2;
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = `10px -apple-system, sans-serif`;
+    for (const dl of descLines.slice(0, 3)) {
+      ctx.fillText(dl, r.x + r.w/2, textY + 5);
+      textY += 11;
+    }
+  }
+
+  // Drill-down indicator
+  if (canDrillDown(n)) {
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('⊕', r.x + r.w - 4, r.y + r.h - 4);
+    ctx.textAlign = 'center';
+  }
+
+  ctx.restore();
+}
+
+function wrapText(c, text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    const test = cur ? cur + ' ' + w : w;
+    if (c.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
+    else cur = test;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+function drawEdge(e) {
+  const diag = getDiagram();
+  const from = diag.nodes.find(n => n.id === e.from);
+  const to = diag.nodes.find(n => n.id === e.to);
+  if (!from || !to) return;
+
+  const p1 = edgeEndpoint(to, from);
+  const p2 = edgeEndpoint(from, to);
+  const sel = state.selection.includes(e.id);
+
+  ctx.save();
+  ctx.strokeStyle = sel ? '#4a90d9' : (e.color || '#888888');
+  ctx.lineWidth = sel ? 2 : 1.5;
+  if (e.style === 'dashed') ctx.setLineDash([6,4]);
+  else if (e.style === 'dotted') ctx.setLineDash([2,3]);
+
+  // Draw line
+  ctx.beginPath();
+  if (e.curved) {
+    const mx = (p1.x + p2.x)/2 + (p2.y - p1.y) * 0.2;
+    const my = (p1.y + p2.y)/2 - (p2.x - p1.x) * 0.2;
+    ctx.moveTo(p1.x, p1.y);
+    ctx.quadraticCurveTo(mx, my, p2.x, p2.y);
+  } else {
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Arrowhead
+  drawArrow(ctx, p1, p2, e);
+
+  // Label
+  if (e.label) {
+    const mx = (p1.x + p2.x)/2, my = (p1.y + p2.y)/2;
+    ctx.fillStyle = '#1a1a2e';
+    const metrics = ctx.measureText(e.label);
+    ctx.fillRect(mx - metrics.width/2 - 3, my - 7, metrics.width + 6, 14);
+    ctx.fillStyle = '#cccccc';
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(e.label, mx, my);
+    if (e.technology) {
+      ctx.fillStyle = '#888';
+      ctx.font = 'italic 10px sans-serif';
+      ctx.fillText(`[${e.technology}]`, mx, my + 12);
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawArrow(c, from, to, edge) {
+  const dx = to.x - from.x, dy = to.y - from.y;
+  const len = Math.sqrt(dx*dx + dy*dy);
+  if (len < 1) return;
+  const ux = dx/len, uy = dy/len;
+  const arrowLen = 10, arrowW = 5;
+  const ax = to.x - ux*arrowLen, ay = to.y - uy*arrowLen;
+
+  c.fillStyle = c.strokeStyle;
+  c.beginPath();
+  c.moveTo(to.x, to.y);
+  c.lineTo(ax - uy*arrowW, ay + ux*arrowW);
+  c.lineTo(ax + uy*arrowW, ay - ux*arrowW);
+  c.closePath();
+
+  if (edge.arrowType === 'open') { c.stroke(); }
+  else if (edge.arrowType === 'diamond') {
+    const bx = ax - ux*arrowLen, by = ay - uy*arrowLen;
+    c.moveTo(to.x, to.y);
+    c.lineTo(ax - uy*arrowW, ay + ux*arrowW);
+    c.lineTo(bx, by);
+    c.lineTo(ax + uy*arrowW, ay - ux*arrowW);
+    c.closePath();
+    c.fill();
+  } else {
+    c.fill();
+  }
+}
+
+function drawGrid() {
+  const gridSize = 20 * state.view.zoom;
+  if (gridSize < 5) return;
+  const ox = state.view.x % gridSize;
+  const oy = state.view.y % gridSize;
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  ctx.lineWidth = 1;
+  for (let x = ox; x < canvas.width; x += gridSize) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = oy; y < canvas.height; y += gridSize) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+}
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawGrid();
+  ctx.save();
+  ctx.translate(state.view.x, state.view.y);
+  ctx.scale(state.view.zoom, state.view.zoom);
+
+  const diag = getDiagram();
+  // Draw edges first
+  for (const e of diag.edges) drawEdge(e);
+
+  // Relation in progress
+  if (state.addingRelation && state.relationStart && state._mouseWorld) {
+    const from = diag.nodes.find(n => n.id === state.relationStart);
+    if (from) {
+      const p1 = nodeCenter(from);
+      ctx.save();
+      ctx.strokeStyle = '#4a90d9';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6,3]);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(state._mouseWorld.x, state._mouseWorld.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  for (const n of diag.nodes) drawNode(n);
+  ctx.restore();
+
+  drawMinimap();
+  updateStatus();
+}
+
+// ─── Minimap ────────────────────────────────────────────────────────────────
+function drawMinimap() {
+  const diag = getDiagram();
+  if (!diag.nodes.length) { mctx.clearRect(0,0,160,120); return; }
+  const mw = 160, mh = 120;
+  mctx.clearRect(0,0,mw,mh);
+  mctx.fillStyle = 'rgba(13,17,23,0.6)';
+  mctx.fillRect(0,0,mw,mh);
+
+  // Bounding box of all nodes
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for (const n of diag.nodes) {
+    const r = nodeRect(n);
+    minX=Math.min(minX,r.x); minY=Math.min(minY,r.y);
+    maxX=Math.max(maxX,r.x+r.w); maxY=Math.max(maxY,r.y+r.h);
+  }
+  const pad = 20;
+  const scale = Math.min((mw-pad*2)/(maxX-minX||1), (mh-pad*2)/(maxY-minY||1));
+  const ox = pad - minX*scale, oy = pad - minY*scale;
+
+  for (const n of diag.nodes) {
+    const r = nodeRect(n);
+    mctx.fillStyle = n.color || '#1168bd';
+    mctx.fillRect(r.x*scale+ox, r.y*scale+oy, r.w*scale, r.h*scale);
+  }
+
+  // Viewport rect
+  const vx = (-state.view.x / state.view.zoom) * scale + ox;
+  const vy = (-state.view.y / state.view.zoom) * scale + oy;
+  const vw = (canvas.width / state.view.zoom) * scale;
+  const vh = (canvas.height / state.view.zoom) * scale;
+  mctx.strokeStyle = '#4a90d9';
+  mctx.lineWidth = 1;
+  mctx.strokeRect(vx, vy, vw, vh);
+}
+
+// ─── Status / legend ────────────────────────────────────────────────────────
+function updateStatus() {
+  const diag = getDiagram();
+  document.getElementById('status-nodes').textContent = `Nodes: ${diag.nodes.length}`;
+  document.getElementById('status-edges').textContent = `Edges: ${diag.edges.length}`;
+  document.getElementById('zoom-label').textContent = `${Math.round(state.view.zoom*100)}%`;
+}
+
+function updateLegend() {
+  const cfg = LEVEL_CONFIG[state.currentLevel];
+  const el = document.getElementById('legend');
+  el.innerHTML = '';
+  for (const l of cfg.legend) {
+    const d = document.createElement('div');
+    d.innerHTML = `<span class="legend-box" style="background:${l.color};border-color:${l.border}"></span><span>${l.label}</span>`;
+    el.appendChild(d);
+  }
+}
+
+// ─── Palette ────────────────────────────────────────────────────────────────
+function buildPalette() {
+  const palette = document.getElementById('shape-palette');
+  palette.innerHTML = '';
+  const cfg = LEVEL_CONFIG[state.currentLevel];
+  for (const s of cfg.shapes) {
+    const el = document.createElement('div');
+    el.className = 'shape-item';
+    el.draggable = true;
+    el.innerHTML = `<span class="shape-icon">${s.icon}</span><span>${s.label}</span>`;
+    el.dataset.type = s.type;
+    el.dataset.color = s.color;
+    el.dataset.label = s.label;
+    el.addEventListener('dragstart', onPaletteDragStart);
+    palette.appendChild(el);
+  }
+}
+
+let dragPaletteType = null, dragPaletteColor = null, dragPaletteLabel = null;
+function onPaletteDragStart(e) {
+  dragPaletteType = e.currentTarget.dataset.type;
+  dragPaletteColor = e.currentTarget.dataset.color;
+  dragPaletteLabel = e.currentTarget.dataset.label;
+  e.dataTransfer.effectAllowed = 'copy';
+}
+
+canvas.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+canvas.addEventListener('drop', e => {
+  e.preventDefault();
+  if (!dragPaletteType) return;
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  const w = toWorld(sx, sy);
+  addNode(dragPaletteType, dragPaletteColor, dragPaletteLabel, w.x - NODE_W/2, w.y - NODE_H/2);
+  dragPaletteType = null;
+});
+
+function addNode(type, color, label, x, y) {
+  const node = { id: genId(), type, color, label, x, y, w: NODE_W, h: NODE_H, description:'', technology:'' };
+  getDiagram().nodes.push(node);
+  state.selection = [node.id];
+  render();
+  updateProperties();
+  return node;
+}
+
+// ─── Interaction ────────────────────────────────────────────────────────────
+let isDragging = false, dragOffsets = [], isPanning = false, panStart = null;
+let isResizing = false, resizeNode = null, resizeStart = null;
+let isSelecting = false, selStart = null;
+let spaceDown = false;
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); spaceDown = true; canvas.classList.add('panning'); }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && e.target === document.body) { deleteSelected(); }
+  if (e.key === 'Escape') { cancelRelation(); hideContextMenu(); }
+  if (e.ctrlKey && e.key === 'a') { e.preventDefault(); selectAll(); }
+  if (e.ctrlKey && e.key === 'z') { e.preventDefault(); /* todo: undo */ }
+});
+document.addEventListener('keyup', e => { if (e.code === 'Space') { spaceDown = false; canvas.classList.remove('panning'); canvas.classList.remove('panning-active'); } });
+
+canvas.addEventListener('mousedown', onMouseDown);
+canvas.addEventListener('mousemove', onMouseMove);
+canvas.addEventListener('mouseup', onMouseUp);
+canvas.addEventListener('dblclick', onDblClick);
+canvas.addEventListener('contextmenu', onContextMenu);
+canvas.addEventListener('wheel', onWheel, { passive: false });
+
+function canvasPos(e) {
+  const r = canvas.getBoundingClientRect();
+  return { sx: e.clientX - r.left, sy: e.clientY - r.top };
+}
+
+function onMouseDown(e) {
+  if (e.button === 1 || (e.button === 0 && spaceDown)) {
+    isPanning = true;
+    panStart = { x: e.clientX - state.view.x, y: e.clientY - state.view.y };
+    canvas.classList.add('panning-active');
+    e.preventDefault(); return;
+  }
+  if (e.button !== 0) return;
+  const { sx, sy } = canvasPos(e);
+  const w = toWorld(sx, sy);
+
+  if (state.addingRelation) {
+    const hit = hitNode(w.x, w.y);
+    if (hit) {
+      if (!state.relationStart) {
+        state.relationStart = hit.id;
+      } else if (hit.id !== state.relationStart) {
+        addEdge(state.relationStart, hit.id);
+        cancelRelation();
+      }
+    } else {
+      cancelRelation();
+    }
+    return;
+  }
+
+  // Check resize handle (bottom-right corner)
+  const hit = hitNode(w.x, w.y);
+  if (hit) {
+    const r = nodeRect(hit);
+    const handleSize = 10 / state.view.zoom;
+    if (w.x > r.x + r.w - handleSize && w.y > r.y + r.h - handleSize) {
+      isResizing = true;
+      resizeNode = hit;
+      resizeStart = { x: w.x, y: w.y, w: r.w, h: r.h };
+      return;
+    }
+  }
+
+  if (hit) {
+    if (!e.shiftKey && !state.selection.includes(hit.id)) state.selection = [hit.id];
+    else if (e.shiftKey) {
+      if (state.selection.includes(hit.id)) state.selection = state.selection.filter(id => id !== hit.id);
+      else state.selection.push(hit.id);
+    } else state.selection = [hit.id];
+
+    isDragging = true;
+    const diag = getDiagram();
+    dragOffsets = state.selection.map(id => {
+      const n = diag.nodes.find(n => n.id === id);
+      return { id, dx: w.x - n.x, dy: w.y - n.y };
+    });
+    updateProperties();
+    render();
+  } else {
+    // Check edge hit
+    const ehit = hitEdge(w.x, w.y);
+    if (ehit) {
+      state.selection = [ehit.id];
+      updateProperties();
+      render();
+      return;
+    }
+    // Start selection rect
+    state.selection = [];
+    isSelecting = true;
+    selStart = { x: sx, y: sy };
+    updateProperties();
+    render();
+  }
+}
+
+function onMouseMove(e) {
+  const { sx, sy } = canvasPos(e);
+  const w = toWorld(sx, sy);
+
+  if (isPanning) {
+    state.view.x = e.clientX - panStart.x;
+    state.view.y = e.clientY - panStart.y;
+    render(); return;
+  }
+
+  if (isResizing && resizeNode) {
+    const dx = w.x - resizeStart.x, dy = w.y - resizeStart.y;
+    resizeNode.w = Math.max(80, resizeStart.w + dx);
+    resizeNode.h = Math.max(50, resizeStart.h + dy);
+    render(); return;
+  }
+
+  if (isDragging && dragOffsets.length) {
+    const diag = getDiagram();
+    for (const o of dragOffsets) {
+      const n = diag.nodes.find(n => n.id === o.id);
+      if (n) { n.x = Math.round((w.x - o.dx) / 10) * 10; n.y = Math.round((w.y - o.dy) / 10) * 10; }
+    }
+    render(); return;
+  }
+
+  if (isSelecting) {
+    const box = document.getElementById('selection-box');
+    const x1 = Math.min(selStart.x, sx), y1 = Math.min(selStart.y, sy);
+    const x2 = Math.max(selStart.x, sx), y2 = Math.max(selStart.y, sy);
+    box.style.display = 'block';
+    box.style.left = x1 + 'px'; box.style.top = y1 + 'px';
+    box.style.width = (x2-x1) + 'px'; box.style.height = (y2-y1) + 'px';
+    return;
+  }
+
+  // Hover
+  const hit = hitNode(w.x, w.y);
+  const newHov = hit ? hit.id : null;
+  if (newHov !== state.hovered) { state.hovered = newHov; render(); }
+
+  if (state.addingRelation) {
+    state._mouseWorld = w;
+    render();
+  }
+
+  document.getElementById('status-pos').textContent = `x: ${Math.round(w.x)}  y: ${Math.round(w.y)}`;
+
+  // Tooltip
+  if (hit && (hit.description || hit.technology)) {
+    const tip = document.getElementById('tooltip');
+    tip.textContent = (hit.technology ? `[${hit.technology}] ` : '') + (hit.description || '');
+    tip.style.display = 'block';
+    tip.style.left = (e.clientX + 12) + 'px';
+    tip.style.top = (e.clientY - 4) + 'px';
+  } else {
+    document.getElementById('tooltip').style.display = 'none';
+  }
+
+  // Resize cursor
+  if (hit) {
+    const r = nodeRect(hit);
+    const handleSize = 10 / state.view.zoom;
+    canvas.style.cursor = (w.x > r.x+r.w-handleSize && w.y > r.y+r.h-handleSize) ? 'nwse-resize' : 'move';
+  } else {
+    canvas.style.cursor = '';
+  }
+}
+
+function onMouseUp(e) {
+  if (isPanning) { isPanning = false; canvas.classList.remove('panning-active'); return; }
+  if (isResizing) { isResizing = false; resizeNode = null; return; }
+  if (isDragging) { isDragging = false; dragOffsets = []; return; }
+  if (isSelecting) {
+    isSelecting = false;
+    const box = document.getElementById('selection-box');
+    const { sx, sy } = canvasPos(e);
+    const x1 = Math.min(selStart.x, sx), y1 = Math.min(selStart.y, sy);
+    const x2 = Math.max(selStart.x, sx), y2 = Math.max(selStart.y, sy);
+    box.style.display = 'none';
+    if (x2 - x1 > 5 || y2 - y1 > 5) {
+      const w1 = toWorld(x1, y1), w2 = toWorld(x2, y2);
+      state.selection = getDiagram().nodes
+        .filter(n => { const r=nodeRect(n); return r.x<w2.x&&r.x+r.w>w1.x&&r.y<w2.y&&r.y+r.h>w1.y; })
+        .map(n => n.id);
+      updateProperties(); render();
+    }
+  }
+}
+
+function onDblClick(e) {
+  const { sx, sy } = canvasPos(e);
+  const w = toWorld(sx, sy);
+  const hit = hitNode(w.x, w.y);
+  if (hit) {
+    const newLabel = prompt('Label:', hit.label);
+    if (newLabel !== null) { hit.label = newLabel; render(); updateProperties(); }
+  }
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  const { sx, sy } = canvasPos(e);
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  const wx = (sx - state.view.x) / state.view.zoom;
+  const wy = (sy - state.view.y) / state.view.zoom;
+  state.view.zoom = Math.max(0.1, Math.min(4, state.view.zoom * factor));
+  state.view.x = sx - wx * state.view.zoom;
+  state.view.y = sy - wy * state.view.zoom;
+  render();
+}
+
+function hitEdge(wx, wy) {
+  const diag = getDiagram();
+  const thresh = 6 / state.view.zoom;
+  for (const e of diag.edges) {
+    const from = diag.nodes.find(n => n.id === e.from);
+    const to = diag.nodes.find(n => n.id === e.to);
+    if (!from || !to) continue;
+    const p1 = nodeCenter(from), p2 = nodeCenter(to);
+    const dist = pointToSegment(wx, wy, p1.x, p1.y, p2.x, p2.y);
+    if (dist < thresh) return e;
+  }
+  return null;
+}
+
+function pointToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx-ax, dy = by-ay;
+  const len2 = dx*dx + dy*dy;
+  if (len2 === 0) return Math.hypot(px-ax, py-ay);
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy) / len2));
+  return Math.hypot(px - (ax+t*dx), py - (ay+t*dy));
+}
+
+// ─── Context menu ───────────────────────────────────────────────────────────
+let ctxTarget = null;
+
+function onContextMenu(e) {
+  e.preventDefault();
+  const { sx, sy } = canvasPos(e);
+  const w = toWorld(sx, sy);
+  const hit = hitNode(w.x, w.y);
+  ctxTarget = hit || hitEdge(w.x, w.y);
+
+  const menu = document.getElementById('context-menu');
+  document.getElementById('ctx-drill').style.display = (hit && canDrillDown(hit)) ? 'block' : 'none';
+  document.getElementById('ctx-color').style.display = hit ? 'block' : 'none';
+  document.getElementById('ctx-duplicate').style.display = hit ? 'block' : 'none';
+
+  menu.style.display = 'block';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+}
+
+function hideContextMenu() { document.getElementById('context-menu').style.display = 'none'; }
+document.addEventListener('click', hideContextMenu);
+document.addEventListener('keydown', e => { if(e.key==='Escape') hideContextMenu(); });
+
+document.getElementById('ctx-edit').addEventListener('click', () => {
+  if (!ctxTarget) return;
+  const newLabel = prompt('Label:', ctxTarget.label);
+  if (newLabel !== null) { ctxTarget.label = newLabel; render(); updateProperties(); }
+});
+
+document.getElementById('ctx-color').addEventListener('click', () => {
+  if (!ctxTarget || !ctxTarget.type) return;
+  const input = document.createElement('input');
+  input.type = 'color'; input.value = ctxTarget.color || '#1168bd';
+  input.addEventListener('input', () => { ctxTarget.color = input.value; render(); updateProperties(); });
+  input.click();
+});
+
+document.getElementById('ctx-duplicate').addEventListener('click', () => {
+  if (!ctxTarget || !ctxTarget.type) return;
+  const copy = { ...ctxTarget, id: genId(), x: ctxTarget.x + 20, y: ctxTarget.y + 20 };
+  getDiagram().nodes.push(copy);
+  state.selection = [copy.id];
+  render(); updateProperties();
+});
+
+document.getElementById('ctx-drill').addEventListener('click', () => {
+  if (ctxTarget) drillDown(ctxTarget);
+});
+
+document.getElementById('ctx-delete').addEventListener('click', () => {
+  if (ctxTarget) {
+    const diag = getDiagram();
+    diag.nodes = diag.nodes.filter(n => n.id !== ctxTarget.id);
+    diag.edges = diag.edges.filter(e => e.id !== ctxTarget.id && e.from !== ctxTarget.id && e.to !== ctxTarget.id);
+    state.selection = [];
+    render(); updateProperties();
+  }
+});
+
+// ─── Drill-down ─────────────────────────────────────────────────────────────
+const LEVEL_ORDER = ['context','container','component','code'];
+
+function canDrillDown(node) {
+  const idx = LEVEL_ORDER.indexOf(state.currentLevel);
+  return idx < LEVEL_ORDER.length - 1 && node.type !== 'person' && node.type !== 'external';
+}
+
+function drillDown(node) {
+  const idx = LEVEL_ORDER.indexOf(state.currentLevel);
+  if (idx >= LEVEL_ORDER.length - 1) return;
+  state.drillStack.push({ level: state.currentLevel, nodeId: node.id, nodeLabel: node.label });
+  switchLevel(LEVEL_ORDER[idx + 1]);
+  updateBreadcrumb();
+}
+
+function updateBreadcrumb() {
+  const bc = document.getElementById('breadcrumb');
+  bc.innerHTML = '';
+  const stack = [...state.drillStack];
+  if (!stack.length) return;
+
+  const addSep = () => { const s = document.createElement('span'); s.className='bc-sep'; s.textContent='›'; bc.appendChild(s); };
+
+  for (let i = 0; i < stack.length; i++) {
+    const entry = stack[i];
+    const s = document.createElement('span');
+    s.className = 'bc-item';
+    s.textContent = entry.nodeLabel;
+    s.dataset.idx = i;
+    s.addEventListener('click', () => {
+      while (state.drillStack.length > i) state.drillStack.pop();
+      switchLevel(stack[i].level);
+      updateBreadcrumb();
+    });
+    bc.appendChild(s);
+    addSep();
+  }
+
+  const cur = document.createElement('span');
+  cur.className = 'bc-current';
+  cur.textContent = LEVEL_CONFIG[state.currentLevel].label;
+  bc.appendChild(cur);
+}
+
+// ─── Edges ──────────────────────────────────────────────────────────────────
+function addEdge(fromId, toId) {
+  const diag = getDiagram();
+  const edge = { id: genId(), from: fromId, to: toId, label:'', technology:'', style:'solid', arrowType:'filled' };
+  diag.edges.push(edge);
+  state.selection = [edge.id];
+  render(); updateProperties();
+  return edge;
+}
+
+function cancelRelation() {
+  state.addingRelation = false;
+  state.relationStart = null;
+  state._mouseWorld = null;
+  document.getElementById('btn-add-rel').textContent = 'Add Relation';
+  document.getElementById('btn-add-rel').classList.remove('primary');
+  render();
+}
+
+document.getElementById('btn-add-rel').addEventListener('click', () => {
+  if (state.addingRelation) { cancelRelation(); return; }
+  state.addingRelation = true;
+  state.relationStart = null;
+  document.getElementById('btn-add-rel').textContent = 'Cancel (Esc)';
+  document.getElementById('btn-add-rel').classList.add('primary');
+  document.getElementById('status-hint').textContent = 'Click source node, then target node';
+});
+
+// ─── Properties panel ───────────────────────────────────────────────────────
+function updateProperties() {
+  const content = document.getElementById('properties-content');
+  content.innerHTML = '';
+
+  if (state.selection.length === 0) {
+    content.innerHTML = '<div id="no-selection">Select an element to edit its properties</div>';
+    return;
+  }
+
+  if (state.selection.length > 1) {
+    content.innerHTML = `<div id="no-selection">${state.selection.length} items selected</div>`;
+    // Bulk color change
+    addProp(content, 'Color', 'color', null, true);
+    return;
+  }
+
+  const id = state.selection[0];
+  const diag = getDiagram();
+  const node = diag.nodes.find(n => n.id === id);
+  const edge = diag.edges.find(e => e.id === id);
+
+  if (node) {
+    addTextProp(content, 'Label', node, 'label');
+    addTextareaProp(content, 'Description', node, 'description');
+    addTextProp(content, 'Technology', node, 'technology');
+    addTextProp(content, 'Stereotype', node, 'stereotype');
+    addColorProp(content, 'Color', node, 'color');
+    addSizeProp(content, node);
+
+    if (canDrillDown(node)) {
+      const btn = document.createElement('button');
+      btn.className = 'btn primary';
+      btn.style.marginTop = '8px';
+      btn.textContent = 'Drill Down ▶';
+      btn.addEventListener('click', () => drillDown(node));
+      content.appendChild(btn);
+    }
+  } else if (edge) {
+    addTextProp(content, 'Label', edge, 'label');
+    addTextProp(content, 'Technology', edge, 'technology');
+    addSelectProp(content, 'Style', edge, 'style', ['solid','dashed','dotted']);
+    addSelectProp(content, 'Arrow', edge, 'arrowType', ['filled','open','diamond']);
+    addColorProp(content, 'Color', edge, 'color');
+    const cb = document.createElement('div');
+    cb.className = 'prop-group';
+    cb.innerHTML = `<label class="prop-label"><input type="checkbox" ${edge.curved?'checked':''} style="margin-right:4px">Curved</label>`;
+    cb.querySelector('input').addEventListener('change', e => { edge.curved = e.target.checked; render(); });
+    content.appendChild(cb);
+  }
+}
+
+function addTextProp(parent, label, obj, key) {
+  const g = document.createElement('div'); g.className = 'prop-group';
+  const l = document.createElement('div'); l.className = 'prop-label'; l.textContent = label;
+  const inp = document.createElement('input'); inp.className = 'prop-input'; inp.type = 'text'; inp.value = obj[key] || '';
+  inp.addEventListener('input', () => { obj[key] = inp.value; render(); });
+  g.appendChild(l); g.appendChild(inp); parent.appendChild(g);
+}
+
+function addTextareaProp(parent, label, obj, key) {
+  const g = document.createElement('div'); g.className = 'prop-group';
+  const l = document.createElement('div'); l.className = 'prop-label'; l.textContent = label;
+  const ta = document.createElement('textarea'); ta.className = 'prop-textarea'; ta.value = obj[key] || '';
+  ta.addEventListener('input', () => { obj[key] = ta.value; render(); });
+  g.appendChild(l); g.appendChild(ta); parent.appendChild(g);
+}
+
+function addSelectProp(parent, label, obj, key, options) {
+  const g = document.createElement('div'); g.className = 'prop-group';
+  const l = document.createElement('div'); l.className = 'prop-label'; l.textContent = label;
+  const sel = document.createElement('select'); sel.className = 'prop-select';
+  for (const o of options) { const opt = document.createElement('option'); opt.value=o; opt.textContent=o; if(o===obj[key]) opt.selected=true; sel.appendChild(opt); }
+  sel.addEventListener('change', () => { obj[key] = sel.value; render(); });
+  g.appendChild(l); g.appendChild(sel); parent.appendChild(g);
+}
+
+function addColorProp(parent, label, obj, key) {
+  const g = document.createElement('div'); g.className = 'prop-group';
+  const l = document.createElement('div'); l.className = 'prop-label'; l.textContent = label;
+  const row = document.createElement('div'); row.className = 'prop-color';
+  const inp = document.createElement('input'); inp.type = 'color'; inp.value = obj[key] || '#1168bd';
+  const hex = document.createElement('input'); hex.className = 'prop-input'; hex.style.flex='1'; hex.value = obj[key] || '#1168bd';
+  inp.addEventListener('input', () => { obj[key] = inp.value; hex.value = inp.value; render(); updateProperties(); });
+  hex.addEventListener('change', () => { if(/^#[0-9a-fA-F]{6}$/.test(hex.value)){ obj[key]=hex.value; inp.value=hex.value; render(); } });
+  row.appendChild(inp); row.appendChild(hex);
+  g.appendChild(l); g.appendChild(row); parent.appendChild(g);
+}
+
+function addSizeProp(parent, node) {
+  const g = document.createElement('div'); g.className = 'prop-group';
+  const l = document.createElement('div'); l.className = 'prop-label'; l.textContent = 'Size (W × H)';
+  const row = document.createElement('div'); row.style.display='flex'; row.style.gap='4px';
+  const wi = document.createElement('input'); wi.className='prop-input'; wi.type='number'; wi.min=60; wi.value=node.w||NODE_W; wi.style.width='50%';
+  const hi = document.createElement('input'); hi.className='prop-input'; hi.type='number'; hi.min=40; hi.value=node.h||NODE_H; hi.style.width='50%';
+  wi.addEventListener('input', () => { node.w=+wi.value||NODE_W; render(); });
+  hi.addEventListener('input', () => { node.h=+hi.value||NODE_H; render(); });
+  row.appendChild(wi); row.appendChild(hi);
+  g.appendChild(l); g.appendChild(row); parent.appendChild(g);
+}
+
+// ─── Level switching ─────────────────────────────────────────────────────────
+function switchLevel(level) {
+  state.currentLevel = level;
+  state.selection = [];
+  document.querySelectorAll('.level-tab').forEach(t => t.classList.toggle('active', t.dataset.level === level));
+  buildPalette();
+  updateLegend();
+  fitView();
+  updateProperties();
+  render();
+}
+
+document.querySelectorAll('.level-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    state.drillStack = [];
+    switchLevel(tab.dataset.level);
+    updateBreadcrumb();
+  });
+});
+
+// ─── Fit / Zoom controls ─────────────────────────────────────────────────────
+function fitView() {
+  const diag = getDiagram();
+  if (!diag.nodes.length) { state.view = {x:0,y:0,zoom:1}; render(); return; }
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for (const n of diag.nodes) {
+    const r = nodeRect(n);
+    minX=Math.min(minX,r.x); minY=Math.min(minY,r.y);
+    maxX=Math.max(maxX,r.x+r.w); maxY=Math.max(maxY,r.y+r.h);
+  }
+  const pad = 60;
+  const scaleX = (canvas.width - pad*2) / (maxX - minX || 1);
+  const scaleY = (canvas.height - pad*2) / (maxY - minY || 1);
+  state.view.zoom = Math.max(0.1, Math.min(2, Math.min(scaleX, scaleY)));
+  state.view.x = pad - minX * state.view.zoom;
+  state.view.y = pad - minY * state.view.zoom;
+  render();
+}
+
+document.getElementById('btn-zoom-in').addEventListener('click', () => { state.view.zoom = Math.min(4, state.view.zoom * 1.2); render(); });
+document.getElementById('btn-zoom-out').addEventListener('click', () => { state.view.zoom = Math.max(0.1, state.view.zoom / 1.2); render(); });
+document.getElementById('btn-zoom-fit').addEventListener('click', fitView);
+
+// ─── Delete ──────────────────────────────────────────────────────────────────
+function deleteSelected() {
+  if (!state.selection.length) return;
+  const diag = getDiagram();
+  const ids = new Set(state.selection);
+  diag.nodes = diag.nodes.filter(n => !ids.has(n.id));
+  diag.edges = diag.edges.filter(e => !ids.has(e.id) && !ids.has(e.from) && !ids.has(e.to));
+  state.selection = [];
+  render(); updateProperties();
+}
+
+function selectAll() {
+  const diag = getDiagram();
+  state.selection = [...diag.nodes.map(n=>n.id), ...diag.edges.map(e=>e.id)];
+  updateProperties(); render();
+}
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (!confirm('Clear all elements on this level?')) return;
+  state.diagrams[state.currentLevel] = { nodes:[], edges:[] };
+  state.selection = [];
+  render(); updateProperties();
+});
+
+// ─── Import / Export ─────────────────────────────────────────────────────────
+let modalMode = '';
+
+document.getElementById('btn-export').addEventListener('click', () => {
+  modalMode = 'export';
+  document.getElementById('modal-title').textContent = 'Export (JSON)';
+  document.getElementById('modal-textarea').value = JSON.stringify(state.diagrams, null, 2);
+  document.getElementById('modal-textarea').readOnly = true;
+  document.getElementById('modal-ok').textContent = 'Copy';
+  document.getElementById('modal-overlay').classList.add('open');
+});
+
+document.getElementById('btn-import').addEventListener('click', () => {
+  modalMode = 'import';
+  document.getElementById('modal-title').textContent = 'Import (JSON)';
+  document.getElementById('modal-textarea').value = '';
+  document.getElementById('modal-textarea').readOnly = false;
+  document.getElementById('modal-ok').textContent = 'Import';
+  document.getElementById('modal-overlay').classList.add('open');
+});
+
+document.getElementById('modal-cancel').addEventListener('click', () => {
+  document.getElementById('modal-overlay').classList.remove('open');
+});
+
+document.getElementById('modal-ok').addEventListener('click', () => {
+  if (modalMode === 'export') {
+    navigator.clipboard.writeText(document.getElementById('modal-textarea').value).catch(()=>{});
+    document.getElementById('modal-overlay').classList.remove('open');
+  } else {
+    try {
+      const data = JSON.parse(document.getElementById('modal-textarea').value);
+      // Support importing full diagrams or just one level
+      if (data.context || data.container || data.component || data.code) {
+        for (const lvl of LEVELS) if (data[lvl]) state.diagrams[lvl] = data[lvl];
+      } else if (data.nodes && data.edges) {
+        state.diagrams[state.currentLevel] = data;
+      }
+      document.getElementById('modal-overlay').classList.remove('open');
+      render(); updateProperties();
+    } catch { alert('Invalid JSON'); }
+  }
+});
+
+// Find highest existing ID so genId won't collide after import
+function syncNextId() {
+  let max = state.nextId;
+  for (const lvl of LEVELS) {
+    const d = state.diagrams[lvl];
+    for (const n of d.nodes) { const m = parseInt(n.id.replace('s_','')); if(!isNaN(m)) max=Math.max(max,m+1); }
+    for (const e of d.edges) { const m = parseInt(e.id.replace('s_','')); if(!isNaN(m)) max=Math.max(max,m+1); }
+  }
+  state.nextId = max;
+}
+
+// ─── Seed initial example ────────────────────────────────────────────────────
+function seedExample() {
+  // Context level
+  const ctx_d = state.diagrams.context;
+  const user   = { id:'s_1', type:'person',   color:'#1168bd', label:'Customer',        x:60,  y:120, w:140, h:90,  description:'A customer using the system', technology:'' };
+  const system = { id:'s_2', type:'system',   color:'#1168bd', label:'Internet Banking', x:280, y:120, w:160, h:90,  description:'Handles all banking operations', technology:'Java / Spring' };
+  const ext    = { id:'s_3', type:'external', color:'#999999', label:'Email System',     x:500, y:120, w:140, h:90,  description:'Sends notifications', technology:'' };
+  const mbank  = { id:'s_4', type:'external', color:'#999999', label:'Mainframe',        x:280, y:280, w:160, h:90,  description:'Core banking system', technology:'' };
+  ctx_d.nodes.push(user, system, ext, mbank);
+  ctx_d.edges.push(
+    { id:'s_5', from:'s_1', to:'s_2', label:'Uses', technology:'HTTPS', style:'solid', arrowType:'filled' },
+    { id:'s_6', from:'s_2', to:'s_3', label:'Sends email', technology:'SMTP', style:'dashed', arrowType:'filled' },
+    { id:'s_7', from:'s_2', to:'s_4', label:'Reads/writes accounts', technology:'TCP/IP', style:'solid', arrowType:'filled' },
+  );
+
+  // Container level
+  const con_d = state.diagrams.container;
+  const spa   = { id:'s_10', type:'webapp',   color:'#1168bd', label:'Single-Page App', x:60,  y:80,  w:150, h:90, description:'Provides all banking UI', technology:'JavaScript/React' };
+  const mob   = { id:'s_11', type:'mobileapp',color:'#1168bd', label:'Mobile App',      x:60,  y:220, w:150, h:90, description:'Banking on the go', technology:'Flutter' };
+  const api2  = { id:'s_12', type:'api',      color:'#1168bd', label:'API Application', x:290, y:150, w:150, h:90, description:'REST API', technology:'Java/Spring' };
+  const db    = { id:'s_13', type:'database', color:'#1168bd', label:'Database',        x:290, y:310, w:150, h:90, description:'User data', technology:'PostgreSQL' };
+  const mf    = { id:'s_14', type:'external', color:'#999999', label:'Mainframe',       x:500, y:150, w:140, h:90, description:'Core banking', technology:'' };
+  const mail  = { id:'s_15', type:'external', color:'#999999', label:'Email System',    x:500, y:310, w:140, h:90, description:'SMTP', technology:'' };
+  const usr   = { id:'s_16', type:'person',   color:'#888888', label:'Customer',        x:60,  y:350, w:140, h:80, description:'', technology:'' };
+  con_d.nodes.push(spa, mob, api2, db, mf, mail, usr);
+  con_d.edges.push(
+    { id:'s_20', from:'s_10', to:'s_12', label:'API calls', technology:'JSON/HTTPS', style:'solid', arrowType:'filled' },
+    { id:'s_21', from:'s_11', to:'s_12', label:'API calls', technology:'JSON/HTTPS', style:'solid', arrowType:'filled' },
+    { id:'s_22', from:'s_12', to:'s_13', label:'Reads/writes', technology:'SQL', style:'solid', arrowType:'filled' },
+    { id:'s_23', from:'s_12', to:'s_14', label:'Calls', technology:'XML/HTTPS', style:'solid', arrowType:'filled' },
+    { id:'s_24', from:'s_12', to:'s_15', label:'Sends email', technology:'SMTP', style:'dashed', arrowType:'filled' },
+    { id:'s_25', from:'s_16', to:'s_10', label:'Uses', style:'solid', arrowType:'filled' },
+    { id:'s_26', from:'s_16', to:'s_11', label:'Uses', style:'solid', arrowType:'filled' },
+  );
+
+  // Component level
+  const cmp_d = state.diagrams.component;
+  const ctrl  = { id:'s_30', type:'component', color:'#1168bd', label:'SignIn Controller',   x:60,  y:80,  w:150, h:80, description:'Allows users to sign in', technology:'Spring MVC' };
+  const sec   = { id:'s_31', type:'component', color:'#1168bd', label:'Security Component',  x:60,  y:220, w:150, h:80, description:'Provides auth', technology:'Spring Security' };
+  const svc   = { id:'s_32', type:'service',   color:'#27ae60', label:'Account Service',     x:280, y:150, w:150, h:80, description:'Account operations', technology:'Spring' };
+  const repo  = { id:'s_33', type:'repo',      color:'#8e44ad', label:'Account Repo',        x:280, y:290, w:150, h:80, description:'JPA repository', technology:'JPA' };
+  const mf2   = { id:'s_34', type:'external',  color:'#999999', label:'Mainframe',           x:490, y:150, w:140, h:80, description:'', technology:'' };
+  const dbc   = { id:'s_35', type:'external',  color:'#999999', label:'Database',            x:490, y:290, w:140, h:80, description:'PostgreSQL', technology:'' };
+  cmp_d.nodes.push(ctrl, sec, svc, repo, mf2, dbc);
+  cmp_d.edges.push(
+    { id:'s_40', from:'s_30', to:'s_31', label:'Uses', style:'solid', arrowType:'filled' },
+    { id:'s_41', from:'s_30', to:'s_32', label:'Uses', style:'solid', arrowType:'filled' },
+    { id:'s_42', from:'s_32', to:'s_33', label:'Uses', style:'solid', arrowType:'filled' },
+    { id:'s_43', from:'s_32', to:'s_34', label:'Reads', technology:'XML/HTTPS', style:'solid', arrowType:'filled' },
+    { id:'s_44', from:'s_33', to:'s_35', label:'Reads/writes', technology:'SQL', style:'solid', arrowType:'filled' },
+  );
+
+  // Code level
+  const code_d = state.diagrams.code;
+  const iface  = { id:'s_50', type:'interface', color:'#16a085', label:'IAccountService',   x:200, y:60,  w:160, h:80, description:'', technology:'' };
+  const cls1   = { id:'s_51', type:'class',     color:'#2c3e50', label:'AccountServiceImpl',x:200, y:210, w:160, h:80, description:'Implements IAccountService', technology:'' };
+  const cls2   = { id:'s_52', type:'class',     color:'#2c3e50', label:'AccountController', x:420, y:60,  w:160, h:80, description:'REST Controller', technology:'' };
+  const cls3   = { id:'s_53', type:'class',     color:'#2c3e50', label:'AccountRepository', x:420, y:210, w:160, h:80, description:'JPA Repo', technology:'' };
+  const ent    = { id:'s_54', type:'class',     color:'#2980b9', label:'Account',           x:200, y:360, w:160, h:80, description:'Domain entity', technology:'' };
+  const enm    = { id:'s_55', type:'enum',      color:'#8e44ad', label:'AccountType',       x:420, y:360, w:160, h:80, description:'CHECKING, SAVINGS', technology:'' };
+  code_d.nodes.push(iface, cls1, cls2, cls3, ent, enm);
+  code_d.edges.push(
+    { id:'s_60', from:'s_51', to:'s_50', label:'implements', style:'dashed', arrowType:'open' },
+    { id:'s_61', from:'s_52', to:'s_50', label:'uses', style:'solid', arrowType:'open' },
+    { id:'s_62', from:'s_51', to:'s_53', label:'uses', style:'solid', arrowType:'filled' },
+    { id:'s_63', from:'s_51', to:'s_54', label:'creates', style:'solid', arrowType:'filled' },
+    { id:'s_64', from:'s_54', to:'s_55', label:'has', style:'solid', arrowType:'diamond' },
+  );
+
+  state.nextId = 100;
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+seedExample();
+buildPalette();
+updateLegend();
+updateBreadcrumb();
+fitView();
+render();
+updateProperties();
+</script>
+</body>
+</html>
