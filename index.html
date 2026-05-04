@@ -577,7 +577,9 @@ function edgeEndpoint(from, to) {
 }
 
 // ─── Theme helpers ────────────────────────────────────────────────────────────
-const getVar = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function getVar(v) {
+  return getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+}
 
 function themeColors() {
   return {
