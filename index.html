@@ -230,7 +230,52 @@ body {
 }
 #drawer-overlay.visible { display: block; }
 
-/* ── Status bar ──────────────────────────────────────────────────────────── */
+/* ── Panel collapse (desktop) ─────────────────────────────────────────────── */
+#sidebar    { transition: width 0.2s ease, opacity 0.2s ease; }
+#properties { transition: width 0.2s ease, opacity 0.2s ease; }
+#header     { transition: padding 0.2s ease, min-height 0.2s ease; }
+
+#sidebar.panel-collapsed    { width: 0 !important; overflow: hidden; border: none; opacity: 0; }
+#properties.panel-collapsed { width: 0 !important; overflow: hidden; border: none; opacity: 0; }
+#header.panel-collapsed     { padding-top: 0; padding-bottom: 0; min-height: 0; max-height: 0; overflow: hidden; border: none; }
+
+/* Panel toggle pills — sit at the border between panels and the canvas */
+.panel-pill {
+  position: absolute;
+  z-index: 110;
+  width: 18px;
+  height: 44px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  box-shadow: 0 2px 8px var(--shadow);
+  transition: background 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.panel-pill:hover { background: var(--bg-hover); color: var(--text); }
+#pill-sidebar { left: 0; top: 50%; transform: translateY(-50%); border-radius: 0 6px 6px 0; border-left: none; }
+#pill-props   { right: 0; top: 50%; transform: translateY(-50%); border-radius: 6px 0 0 6px; border-right: none; }
+#pill-header  { bottom: 0; left: 50%; transform: translateX(-50%); border-radius: 0 0 6px 6px; border-top: none; width: 44px; height: 14px; }
+
+/* Status bar panel toggles */
+.sb-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1.6;
+  transition: all 0.12s;
+}
+.sb-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.sb-toggle.dim   { opacity: 0.45; }
 #statusbar { background: var(--bg-panel); border-top: 1px solid var(--border); padding: 4px 12px; font-size: 11px; color: var(--text-muted); display: flex; gap: 16px; flex-shrink: 0; }
 #version-stamp { margin-left: auto; color: var(--text-muted); opacity: 0.6; font-family: monospace; }
 
@@ -360,11 +405,14 @@ body {
 </div>
 
 <div id="statusbar">
+  <button class="sb-toggle" id="sb-sidebar"  title="Toggle palette">☰ Palette</button>
+  <button class="sb-toggle" id="sb-header"   title="Toggle toolbar">⊟ Toolbar</button>
+  <button class="sb-toggle" id="sb-props"    title="Toggle properties">⊞ Props</button>
   <span id="status-pos">x: 0  y: 0</span>
   <span id="status-nodes">Nodes: 0</span>
   <span id="status-edges">Edges: 0</span>
   <span id="status-hint">Drag palette items · Double-tap to rename · Pinch to zoom</span>
-  <span id="version-stamp">v2026-05-04g</span>
+  <span id="version-stamp">v2026-05-04h</span>
 </div>
 
 <div id="context-menu">
@@ -450,13 +498,14 @@ const LEVEL_CONFIG = {
   container: {
     label: 'Container',
     shapes: [
-      { type:'webapp',    label:'Web App',        color:'#438DD5', icon:'🌐' },
-      { type:'mobileapp', label:'Mobile App',     color:'#438DD5', icon:'📱' },
-      { type:'api',       label:'API / Service',  color:'#438DD5', icon:'⚙️' },
-      { type:'database',  label:'Database',       color:'#438DD5', icon:'🗄️' },
-      { type:'queue',     label:'Message Queue',  color:'#438DD5', icon:'📨' },
-      { type:'person',    label:'Person',         color:'#08427B', icon:'👤' },
-      { type:'external',  label:'External',       color:'#999999', icon:'⬚' },
+      { type:'webapp',    label:'Web App',           color:'#438DD5', icon:'🌐' },
+      { type:'mobileapp', label:'Mobile App',        color:'#438DD5', icon:'📱' },
+      { type:'api',       label:'API / Service',     color:'#438DD5', icon:'⚙️' },
+      { type:'database',  label:'Database',          color:'#438DD5', icon:'🗄️' },
+      { type:'queue',     label:'Message Queue',     color:'#438DD5', icon:'📨' },
+      { type:'person',    label:'Person',            color:'#08427B', icon:'👤' },
+      { type:'external',  label:'External',          color:'#999999', icon:'⬚' },
+      { type:'boundary',  label:'Org. Boundary',     color:'#999999', icon:'▭'  },
     ],
     legend: [
       { color:'#438DD5', border:'#3C7FC0', label:'Container' },
@@ -500,7 +549,7 @@ const LEVEL_CONFIG = {
 const STEREO = {
   person:'Person', system:'Software System', external:'External System',
   webapp:'Web App', mobileapp:'Mobile App', api:'API / Service',
-  database:'Database', queue:'Message Queue',
+  database:'Database', queue:'Message Queue', boundary:'Organisational Boundary',
   component:'Component', service:'Service', repo:'Repository',
   facade:'Facade', factory:'Factory',
   class:'Class', interface:'Interface', abstract:'Abstract Class',
@@ -560,11 +609,19 @@ const toScreen = (wx,wy) => ({ x: wx*state.view.zoom+state.view.x,  y: wy*state.
 // ─── Node helpers ─────────────────────────────────────────────────────────────
 const nodeRect   = n => ({ x:n.x, y:n.y, w:n.w||NODE_W, h:n.h||NODE_H });
 const nodeCenter = n => { const r=nodeRect(n); return {x:r.x+r.w/2, y:r.y+r.h/2}; };
-const canDrillDown = n => state.currentLevel === 'container' && n.type !== 'person' && n.type !== 'external';
+const canDrillDown = n => state.currentLevel === 'container' && !['person','external','boundary'].includes(n.type);
 
 function hitNode(wx, wy) {
   const nodes = getDiagram().nodes;
+  // Non-boundary nodes take priority (checked in reverse paint order)
   for (let i = nodes.length-1; i >= 0; i--) {
+    if (nodes[i].type === 'boundary') continue;
+    const r = nodeRect(nodes[i]);
+    if (wx>=r.x && wx<=r.x+r.w && wy>=r.y && wy<=r.y+r.h) return nodes[i];
+  }
+  // Fall back to boundary if nothing else hit
+  for (let i = nodes.length-1; i >= 0; i--) {
+    if (nodes[i].type !== 'boundary') continue;
     const r = nodeRect(nodes[i]);
     if (wx>=r.x && wx<=r.x+r.w && wy>=r.y && wy<=r.y+r.h) return nodes[i];
   }
@@ -707,6 +764,25 @@ function drawNode(n) {
       ctx.fillStyle = SK_DESC; ctx.font = '9px monospace';
       ctx.textAlign = 'right'; ctx.fillText('▶▶', r.x + r.w - 5, r.y + r.h - 5);
     }
+    ctx.restore(); return;
+  }
+
+  // ── Organisational boundary (large dashed box, label top-left) ───────────
+  if (n.type === 'boundary') {
+    ctx.fillStyle   = 'rgba(160,160,160,0.07)';
+    ctx.strokeStyle = sel ? SK_SEL : '#999999';
+    ctx.lineWidth   = sel ? 2 : 1.5;
+    ctx.setLineDash([10,6]);
+    roundRect(ctx, r.x, r.y, r.w, r.h, 6);
+    ctx.fill(); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.shadowBlur = 0;
+
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillStyle = '#999999'; ctx.font = 'italic 10px -apple-system,sans-serif';
+    ctx.fillText('[Organisational Boundary]', r.x + 10, r.y + 8);
+    ctx.fillStyle = SK_TEXT; ctx.font = 'bold 12px -apple-system,sans-serif';
+    ctx.fillText(n.label || 'Boundary', r.x + 10, r.y + 22);
     ctx.restore(); return;
   }
 
@@ -896,7 +972,9 @@ function render() {
     }
   }
 
-  for (const n of nodes) drawNode(n);
+  // Boundaries render behind all other nodes
+  for (const n of nodes) { if (n.type === 'boundary') drawNode(n); }
+  for (const n of nodes) { if (n.type !== 'boundary') drawNode(n); }
   ctx.restore();
   drawMinimap();
   updateStatus();
@@ -998,7 +1076,9 @@ function moveGhost(cx, cy) {
 }
 
 function addNode(type, color, label, x, y) {
-  const node = { id:genId(), type, color, label, x:Math.round(x/10)*10, y:Math.round(y/10)*10, w:NODE_W, h:NODE_H, description:'', technology:'' };
+  const w = type === 'boundary' ? 320 : NODE_W;
+  const h = type === 'boundary' ? 210 : NODE_H;
+  const node = { id:genId(), type, color, label, x:Math.round(x/10)*10, y:Math.round(y/10)*10, w, h, description:'', technology:'' };
   getDiagram().nodes.push(node);
   state.selection = [node.id];
   render(); updateProperties();
@@ -1476,6 +1556,20 @@ document.getElementById('btn-props-toggle').addEventListener('click',()=>{
   document.getElementById('sidebar').classList.remove('open');
   drawerOverlay.classList.toggle('visible',open);
 });
+
+// ─── Panel visibility toggles ─────────────────────────────────────────────────
+function makePanelToggle(btnId, panelId) {
+  const btn   = document.getElementById(btnId);
+  const panel = document.getElementById(panelId);
+  btn.addEventListener('click', () => {
+    const collapsed = panel.classList.toggle('panel-collapsed');
+    btn.classList.toggle('dim', collapsed);
+    resize(); // reflow canvas after panel size change
+  });
+}
+makePanelToggle('sb-sidebar', 'sidebar');
+makePanelToggle('sb-header',  'header');
+makePanelToggle('sb-props',   'properties');
 
 // ─── Save / Open (file-based, domain-independent) ───────────────────────────
 function downloadText(filename, text, mime='application/octet-stream') {
