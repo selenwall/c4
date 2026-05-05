@@ -364,7 +364,7 @@ body {
   <span id="status-nodes">Nodes: 0</span>
   <span id="status-edges">Edges: 0</span>
   <span id="status-hint">Drag palette items · Double-tap to rename · Pinch to zoom</span>
-  <span id="version-stamp">v2026-05-04f</span>
+  <span id="version-stamp">v2026-05-04g</span>
 </div>
 
 <div id="context-menu">
@@ -433,8 +433,6 @@ function skBorder(n) { return isExternal(n) ? SK_BORDER_EX : SK_BORDER; }
 function isExternal(n) { return n.type === 'external' || n.type === 'extperson'; }
 
 // ─── Level config ────────────────────────────────────────────────────────────
-const LEVELS = ['context','container','component','code'];
-
 const LEVEL_CONFIG = {
   context: {
     label: 'System Context',
@@ -514,7 +512,9 @@ const NODE_W = 140, NODE_H = 80;
 
 let state = {
   currentLevel: 'context',
-  diagrams: { context:{nodes:[],edges:[]}, container:{nodes:[],edges:[]}, component:{nodes:[],edges:[]}, code:{nodes:[],edges:[]} },
+  diagrams: { context:{nodes:[],edges:[]}, container:{nodes:[],edges:[]}, code:{nodes:[],edges:[]} },
+  componentDiagrams: {},  // keyed by container node id
+  drillContext: null,     // container node id currently drilled into
   view: { x: 40, y: 40, zoom: 1 },
   selection: [],
   hovered: null,
@@ -525,7 +525,17 @@ let state = {
   nextId: 1,
 };
 
-function getDiagram() { return state.diagrams[state.currentLevel]; }
+function getDiagram() {
+  if (state.currentLevel === 'component') {
+    const id = state.drillContext;
+    if (id) {
+      if (!state.componentDiagrams[id]) state.componentDiagrams[id] = { nodes:[], edges:[] };
+      return state.componentDiagrams[id];
+    }
+    return { nodes:[], edges:[] }; // no container selected yet
+  }
+  return state.diagrams[state.currentLevel];
+}
 function genId() { return 's_' + (state.nextId++); }
 
 // ─── Canvas ───────────────────────────────────────────────────────────────────
@@ -550,8 +560,7 @@ const toScreen = (wx,wy) => ({ x: wx*state.view.zoom+state.view.x,  y: wy*state.
 // ─── Node helpers ─────────────────────────────────────────────────────────────
 const nodeRect   = n => ({ x:n.x, y:n.y, w:n.w||NODE_W, h:n.h||NODE_H });
 const nodeCenter = n => { const r=nodeRect(n); return {x:r.x+r.w/2, y:r.y+r.h/2}; };
-const LEVEL_ORDER = ['context','container','component','code'];
-const canDrillDown = n => LEVEL_ORDER.indexOf(state.currentLevel) < 3 && n.type !== 'person' && n.type !== 'external';
+const canDrillDown = n => state.currentLevel === 'container' && n.type !== 'person' && n.type !== 'external';
 
 function hitNode(wx, wy) {
   const nodes = getDiagram().nodes;
@@ -855,6 +864,18 @@ function drawEdge(e) {
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
+
+  // Show hint when on component level but no container selected
+  if (state.currentLevel === 'component' && !state.drillContext) {
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = getVar('--text-muted');
+    ctx.font = '15px -apple-system,sans-serif';
+    ctx.fillText('Double-click a container in L2 to view its components', canvas.width/2, canvas.height/2);
+    ctx.restore();
+    drawMinimap(); updateStatus(); return;
+  }
+
   ctx.save();
   ctx.translate(state.view.x, state.view.y);
   ctx.scale(state.view.zoom, state.view.zoom);
@@ -1268,10 +1289,10 @@ document.getElementById('ctx-delete').addEventListener('click', () => {
 
 // ─── Drill-down ───────────────────────────────────────────────────────────────
 function drillDown(node) {
-  const idx=LEVEL_ORDER.indexOf(state.currentLevel);
-  if (idx>=3) return;
-  state.drillStack.push({level:state.currentLevel, nodeId:node.id, nodeLabel:node.label});
-  switchLevel(LEVEL_ORDER[idx+1]);
+  if (state.currentLevel !== 'container') return;
+  state.drillStack.push({level: state.currentLevel, nodeId: node.id, nodeLabel: node.label});
+  state.drillContext = node.id;
+  switchLevel('component');
   updateBreadcrumb();
 }
 
@@ -1283,7 +1304,12 @@ function updateBreadcrumb() {
   const sep=()=>{const s=document.createElement('span');s.className='bc-sep';s.textContent='›';bc.appendChild(s);};
   stack.forEach((entry,i)=>{
     const s=document.createElement('span'); s.className='bc-item'; s.textContent=entry.nodeLabel;
-    s.addEventListener('click',()=>{while(state.drillStack.length>i)state.drillStack.pop();switchLevel(stack[i].level);updateBreadcrumb();});
+    s.addEventListener('click',()=>{
+      while(state.drillStack.length>i) state.drillStack.pop();
+      state.drillContext = null;
+      switchLevel(stack[i].level);
+      updateBreadcrumb();
+    });
     bc.appendChild(s); sep();
   });
   const cur=document.createElement('span'); cur.className='bc-current'; cur.textContent=LEVEL_CONFIG[state.currentLevel].label;
@@ -1394,7 +1420,7 @@ function switchLevel(level) {
   buildPalette(); updateLegend(); fitView(); updateProperties(); render();
 }
 document.querySelectorAll('.level-tab').forEach(tab=>{
-  tab.addEventListener('click',()=>{ state.drillStack=[]; switchLevel(tab.dataset.level); updateBreadcrumb(); });
+  tab.addEventListener('click',()=>{ state.drillStack=[]; state.drillContext=null; switchLevel(tab.dataset.level); updateBreadcrumb(); });
 });
 
 // ─── Zoom / fit ───────────────────────────────────────────────────────────────
@@ -1461,7 +1487,7 @@ function downloadText(filename, text, mime='application/octet-stream') {
 }
 
 document.getElementById('btn-save').addEventListener('click', () => {
-  const payload = JSON.stringify({version:1, diagrams: state.diagrams, nextId: state.nextId}, null, 2);
+  const payload = JSON.stringify({version:1, diagrams: state.diagrams, componentDiagrams: state.componentDiagrams, nextId: state.nextId}, null, 2);
   downloadText('diagram.c4model', payload, 'application/json');
 });
 
@@ -1477,15 +1503,17 @@ document.getElementById('file-input').addEventListener('change', e => {
   reader.onload = ev => {
     try {
       const data = JSON.parse(ev.target.result);
-      const diagrams = data.diagrams || data; // support bare-diagrams JSON too
-      if (diagrams.context || diagrams.container || diagrams.component || diagrams.code) {
-        for (const l of LEVELS) if (diagrams[l]) state.diagrams[l] = diagrams[l];
+      const diagrams = data.diagrams || data;
+      if (diagrams.context || diagrams.container || diagrams.code) {
+        for (const l of ['context','container','code']) if (diagrams[l]) state.diagrams[l] = diagrams[l];
+        state.componentDiagrams = data.componentDiagrams || {};
       } else if (diagrams.nodes && diagrams.edges) {
         state.diagrams[state.currentLevel] = diagrams;
       } else {
         alert('Unrecognized file format.');
         return;
       }
+      state.drillContext = null; state.drillStack = [];
       if (data.nextId) state.nextId = data.nextId;
       syncNextId();
       state.selection = [];
@@ -1545,7 +1573,9 @@ function drawioLabel(n) {
 
 document.getElementById('btn-drawio').addEventListener('click', () => {
   const {nodes, edges} = getDiagram();
-  const levelLabel = LEVEL_CONFIG[state.currentLevel]?.label || state.currentLevel;
+  const containerName = state.drillContext
+    ? (state.drillStack.find(e=>e.nodeId===state.drillContext)?.nodeLabel || state.drillContext)
+    : null;
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<mxGraphModel><root>\n<mxCell id="0"/>\n<mxCell id="1" parent="0"/>\n`;
 
   for (const n of nodes) {
@@ -1565,11 +1595,13 @@ document.getElementById('btn-drawio').addEventListener('click', () => {
   }
 
   xml += `</root></mxGraphModel>`;
-  downloadText(`c4-${state.currentLevel}.drawio`, xml, 'application/xml');
+  const suffix = containerName ? containerName.replace(/\s+/g,'-').toLowerCase() : state.currentLevel;
+  downloadText(`c4-${suffix}.drawio`, xml, 'application/xml');
 });
 function syncNextId() {
   let max=state.nextId;
-  for(const l of LEVELS){const d=state.diagrams[l];for(const n of [...d.nodes,...d.edges]){const m=parseInt(n.id.replace('s_',''));if(!isNaN(m))max=Math.max(max,m+1);}}
+  const allDiags=[...Object.values(state.diagrams),...Object.values(state.componentDiagrams||{})];
+  for(const d of allDiags){for(const n of [...(d.nodes||[]),(d.edges||[])]){const m=parseInt(String(n.id).replace('s_',''));if(!isNaN(m))max=Math.max(max,m+1);}}
   state.nextId=max;
 }
 
@@ -1608,7 +1640,9 @@ function seed() {
     {id:'s_26',from:'s_16',to:'s_11',label:'Views account balances, and makes payments using', technology:'',style:'solid',arrowType:'filled'},
   );
 
-  const cp=state.diagrams.component;
+  // Components belong to the 'API Application' container (s_12)
+  const cp={nodes:[],edges:[]};
+  state.componentDiagrams['s_12']=cp;
   const ctrl={id:'s_30',type:'component',color:null,label:'Sign In Controller',    x:50, y:70, w:155,h:90,description:'Allows users to sign in to the Internet Banking System.',technology:'Spring MVC Rest Controller'};
   const sec ={id:'s_31',type:'component',color:null,label:'Security Component',    x:50, y:220,w:155,h:90,description:'Provides functionality related to signing in, changing passwords, etc.',technology:'Spring Bean'};
   const svc ={id:'s_32',type:'component',color:null,label:'Accounts Summary Ctr',  x:280,y:145,w:155,h:90,description:'Provides customers with a summary of their bank accounts.',technology:'Spring MVC Rest Controller'};
@@ -1657,7 +1691,7 @@ try {
   fitView();
   render();
   updateProperties();
-  console.log('[C4] v2026-05-04f initialised — nodes:', getDiagram().nodes.length);
+  console.log('[C4] v2026-05-04g initialised — nodes:', getDiagram().nodes.length);
 } catch(err) {
   const banner = document.getElementById('error-banner');
   const msg    = document.getElementById('error-msg');
