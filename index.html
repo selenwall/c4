@@ -1195,7 +1195,7 @@ function onPointerDown(e) {
   if (hit) {
     // Resize handle detection (8-point)
     const r = nodeRect(hit);
-    const hs = 8 / state.view.zoom;
+    const hs = (e.pointerType==='touch' ? 18 : 8) / state.view.zoom;
     const near=(hx,hy)=>Math.abs(w.x-hx)<hs&&Math.abs(w.y-hy)<hs;
     let handle=null;
     if      (near(r.x,        r.y       )) handle='nw';
@@ -1208,7 +1208,8 @@ function onPointerDown(e) {
     else if (near(r.x+r.w,   r.y+r.h/2 )) handle='e';
     if (handle) {
       isResizing=true; resizeNode=hit; resizeHandle=handle;
-      resizeStart={x:w.x,y:w.y,nx:hit.x,ny:hit.y,nw:r.w,nh:r.h}; return;
+      resizeStart={x:w.x,y:w.y,nx:hit.x,ny:hit.y,nw:r.w,nh:r.h};
+      clearLongPress(); return;
     }
     if (!e.shiftKey && !state.selection.includes(hit.id)) state.selection=[hit.id];
     else if (e.shiftKey) {
@@ -1248,7 +1249,7 @@ function onPointerMove(e) {
   }
 
   // Single-finger touch pan (only when not on a node and not adding relation)
-  if (e.pointerType==='touch' && activeTouches.size===1 && !isDragging && !state.addingRelation) {
+  if (e.pointerType==='touch' && activeTouches.size===1 && !isDragging && !isResizing && !state.addingRelation) {
     if (!isPanning) {
       if (longPressTarget) {
         const dx=e.clientX-longPressTarget.sx-canvas.getBoundingClientRect().left;
