@@ -119,7 +119,7 @@ body {
   #breadcrumb, #status-hint { display: none; }
   .level-tab { padding: 4px 8px; font-size: 11px; }
   #header h1 { display: none; }
-  #btn-drawio, #btn-clear { display: none; }
+  #btn-drawio, #btn-clear, #btn-clear-all { display: none; }
   #header { padding: 6px 8px; gap: 6px; }
   .btn { padding: 6px 8px; font-size: 11px; }
   #btn-add-rel { padding: 6px 10px; }
@@ -372,6 +372,7 @@ body {
     <button class="btn" id="btn-drawio">→ DrawIO</button>
     <button class="btn primary" id="btn-add-rel">+ Relation</button>
     <button class="btn danger" id="btn-clear">Clear</button>
+    <button class="btn danger" id="btn-clear-all">Clear All</button>
     <button class="hamburger" id="btn-props-toggle" title="Properties">⚙</button>
   </div>
 </div>
@@ -1529,8 +1530,28 @@ function deleteSelected() {
 function selectAll() { const d=getDiagram(); state.selection=[...d.nodes.map(n=>n.id),...d.edges.map(e=>e.id)]; updateProperties(); render(); }
 
 document.getElementById('btn-clear').addEventListener('click',()=>{
-  if(!confirm('Clear all elements on this level?')) return;
-  state.diagrams[state.currentLevel]={nodes:[],edges:[]}; state.selection=[]; render(); updateProperties();
+  if (state.currentLevel === 'component') {
+    if (!state.drillContext) return;
+    if (!confirm('Clear all elements in this component diagram?')) return;
+    state.componentDiagrams[state.drillContext] = {nodes:[], edges:[]};
+  } else if (state.currentLevel === 'container') {
+    if (!confirm('Clear all containers and their component diagrams?')) return;
+    state.diagrams.container = {nodes:[], edges:[]};
+    state.componentDiagrams = {};
+  } else {
+    if (!confirm('Clear all elements on this level?')) return;
+    state.diagrams[state.currentLevel] = {nodes:[], edges:[]};
+  }
+  state.selection=[]; render(); updateProperties();
+});
+
+document.getElementById('btn-clear-all').addEventListener('click',()=>{
+  if (!confirm('Clear all content from every level and diagram?')) return;
+  state.diagrams = { context:{nodes:[],edges:[]}, container:{nodes:[],edges:[]}, code:{nodes:[],edges:[]} };
+  state.componentDiagrams = {};
+  state.selection = []; state.drillStack = []; state.drillContext = null;
+  if (state.currentLevel === 'component') { state.currentLevel = 'container'; }
+  render(); updateProperties(); updateBreadcrumb();
 });
 
 // ─── Theme: light only ───────────────────────────────────────────────────────
