@@ -938,6 +938,26 @@ function drawEdge(e) {
   ctx.restore();
 }
 
+function drawResizeHandles(n) {
+  const r = nodeRect(n);
+  const hs = 5 / state.view.zoom;
+  const lw = 1.5 / state.view.zoom;
+  ctx.save();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff';
+  ctx.strokeStyle = SK_SEL;
+  ctx.lineWidth = lw;
+  const pts = [
+    [r.x,        r.y       ], [r.x+r.w/2, r.y       ], [r.x+r.w,   r.y       ],
+    [r.x,        r.y+r.h/2 ],                           [r.x+r.w,   r.y+r.h/2 ],
+    [r.x,        r.y+r.h   ], [r.x+r.w/2, r.y+r.h   ], [r.x+r.w,   r.y+r.h   ],
+  ];
+  for (const [hx,hy] of pts) {
+    ctx.beginPath(); ctx.rect(hx-hs, hy-hs, hs*2, hs*2); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
@@ -976,6 +996,8 @@ function render() {
   // Boundaries render behind all other nodes
   for (const n of nodes) { if (n.type === 'boundary') drawNode(n); }
   for (const n of nodes) { if (n.type !== 'boundary') drawNode(n); }
+  // Resize handles on top of everything
+  for (const id of state.selection) { const n=nodes.find(n=>n.id===id); if(n) drawResizeHandles(n); }
   ctx.restore();
   drawMinimap();
   updateStatus();
@@ -1088,7 +1110,7 @@ function addNode(type, color, label, x, y) {
 
 // ─── Canvas pointer interaction ───────────────────────────────────────────────
 let isDragging=false, dragOffsets=[], isPanning=false, panStart=null;
-let isResizing=false, resizeNode=null, resizeStart=null;
+let isResizing=false, resizeNode=null, resizeStart=null, resizeHandle=null;
 let isSelecting=false, selStart=null;
 let spaceDown=false;
 let longPressTimer=null, longPressTarget=null;
@@ -1171,11 +1193,22 @@ function onPointerDown(e) {
 
   const hit = hitNode(w.x, w.y);
   if (hit) {
-    // Resize handle
+    // Resize handle detection (8-point)
     const r = nodeRect(hit);
-    const hs = 12 / state.view.zoom;
-    if (w.x > r.x+r.w-hs && w.y > r.y+r.h-hs) {
-      isResizing=true; resizeNode=hit; resizeStart={x:w.x,y:w.y,w:r.w,h:r.h}; return;
+    const hs = 8 / state.view.zoom;
+    const near=(hx,hy)=>Math.abs(w.x-hx)<hs&&Math.abs(w.y-hy)<hs;
+    let handle=null;
+    if      (near(r.x,        r.y       )) handle='nw';
+    else if (near(r.x+r.w,   r.y       )) handle='ne';
+    else if (near(r.x,        r.y+r.h   )) handle='sw';
+    else if (near(r.x+r.w,   r.y+r.h   )) handle='se';
+    else if (near(r.x+r.w/2, r.y       )) handle='n';
+    else if (near(r.x+r.w/2, r.y+r.h   )) handle='s';
+    else if (near(r.x,        r.y+r.h/2 )) handle='w';
+    else if (near(r.x+r.w,   r.y+r.h/2 )) handle='e';
+    if (handle) {
+      isResizing=true; resizeNode=hit; resizeHandle=handle;
+      resizeStart={x:w.x,y:w.y,nx:hit.x,ny:hit.y,nw:r.w,nh:r.h}; return;
     }
     if (!e.shiftKey && !state.selection.includes(hit.id)) state.selection=[hit.id];
     else if (e.shiftKey) {
@@ -1232,8 +1265,19 @@ function onPointerMove(e) {
   const w=toWorld(sx,sy);
 
   if (isResizing && resizeNode) {
-    resizeNode.w = Math.max(80,  resizeStart.w + (w.x-resizeStart.x));
-    resizeNode.h = Math.max(50,  resizeStart.h + (w.y-resizeStart.y));
+    const dx=w.x-resizeStart.x, dy=w.y-resizeStart.y;
+    const snap=v=>Math.round(v/10)*10;
+    const minW=80, minH=50;
+    switch(resizeHandle) {
+      case 'se': resizeNode.w=snap(Math.max(minW,resizeStart.nw+dx)); resizeNode.h=snap(Math.max(minH,resizeStart.nh+dy)); break;
+      case 'sw': { const nw=snap(Math.max(minW,resizeStart.nw-dx)); resizeNode.x=resizeStart.nx+(resizeStart.nw-nw); resizeNode.w=nw; resizeNode.h=snap(Math.max(minH,resizeStart.nh+dy)); break; }
+      case 'ne': { const nh=snap(Math.max(minH,resizeStart.nh-dy)); resizeNode.y=resizeStart.ny+(resizeStart.nh-nh); resizeNode.w=snap(Math.max(minW,resizeStart.nw+dx)); resizeNode.h=nh; break; }
+      case 'nw': { const nw=snap(Math.max(minW,resizeStart.nw-dx)); const nh=snap(Math.max(minH,resizeStart.nh-dy)); resizeNode.x=resizeStart.nx+(resizeStart.nw-nw); resizeNode.y=resizeStart.ny+(resizeStart.nh-nh); resizeNode.w=nw; resizeNode.h=nh; break; }
+      case 'n':  { const nh=snap(Math.max(minH,resizeStart.nh-dy)); resizeNode.y=resizeStart.ny+(resizeStart.nh-nh); resizeNode.h=nh; break; }
+      case 's':  resizeNode.h=snap(Math.max(minH,resizeStart.nh+dy)); break;
+      case 'w':  { const nw=snap(Math.max(minW,resizeStart.nw-dx)); resizeNode.x=resizeStart.nx+(resizeStart.nw-nw); resizeNode.w=nw; break; }
+      case 'e':  resizeNode.w=snap(Math.max(minW,resizeStart.nw+dx)); break;
+    }
     render(); return;
   }
 
@@ -1266,8 +1310,16 @@ function onPointerMove(e) {
     } else document.getElementById('tooltip').style.display='none';
 
     const r=hit?nodeRect(hit):null;
-    const hs=12/state.view.zoom;
-    canvas.style.cursor = r&&w.x>r.x+r.w-hs&&w.y>r.y+r.h-hs ? 'nwse-resize' : hit?'move':'';
+    const hs=8/state.view.zoom;
+    let cur=hit?'move':'';
+    if (r) {
+      const near=(hx,hy)=>Math.abs(w.x-hx)<hs&&Math.abs(w.y-hy)<hs;
+      if (near(r.x,r.y)||near(r.x+r.w,r.y+r.h)) cur='nwse-resize';
+      else if (near(r.x+r.w,r.y)||near(r.x,r.y+r.h)) cur='nesw-resize';
+      else if (near(r.x+r.w/2,r.y)||near(r.x+r.w/2,r.y+r.h)) cur='ns-resize';
+      else if (near(r.x,r.y+r.h/2)||near(r.x+r.w,r.y+r.h/2)) cur='ew-resize';
+    }
+    canvas.style.cursor=cur;
     document.getElementById('status-pos').textContent=`x: ${Math.round(w.x)}  y: ${Math.round(w.y)}`;
   }
 
@@ -1279,7 +1331,7 @@ function onPointerUp(e) {
   clearLongPress();
 
   if (isPanning && activeTouches.size===0) { isPanning=false; canvas.classList.remove('panning-active'); return; }
-  if (isResizing) { isResizing=false; resizeNode=null; return; }
+  if (isResizing) { isResizing=false; resizeNode=null; resizeHandle=null; return; }
   if (isDragging) { isDragging=false; dragOffsets=[]; return; }
   if (isSelecting) {
     isSelecting=false;
@@ -1294,7 +1346,7 @@ function onPointerUp(e) {
   }
 }
 
-function onPointerCancel(e) { activeTouches.delete(e.pointerId); clearLongPress(); isPanning=false; isDragging=false; isResizing=false; isSelecting=false; document.getElementById('selection-box').style.display='none'; }
+function onPointerCancel(e) { activeTouches.delete(e.pointerId); clearLongPress(); isPanning=false; isDragging=false; isResizing=false; resizeHandle=null; isSelecting=false; document.getElementById('selection-box').style.display='none'; }
 
 function clearLongPress() { if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;} longPressTarget=null; }
 
